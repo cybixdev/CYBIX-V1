@@ -2,16 +2,18 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 const path = require('path');
+const express = require('express');
 const config = require('./config');
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 global.users = new Set();
 global.groups = new Set();
 
+// --- Telegram Bot Menu ---
 function sendMenu(ctx) {
   const menu =
-`╭━━━━━【 CYBIX V1 】━━━━━
-┃ @${ctx.from.username || ctx.from.first_name}
+`╭━━━━━━━【 CYBIX V1 】━━━━━━━
+┃ Hello @${ctx.from.username || ctx.from.first_name} how are you doing 
 ┣━ users: ${global.users.size}
 ┣━ groups: ${global.groups.size}
 ┣━ prefix: "."
@@ -66,7 +68,7 @@ function sendMenu(ctx) {
 ┃ • .groupstat
 ╰━━━━━━━━━━━━━━━
 
-▣ powered by **CYBIX TECH** 👹💀
+▣ powered by *CYBIX TECH* 👹💀
 `;
 
   return ctx.replyWithPhoto(
@@ -79,7 +81,7 @@ function sendMenu(ctx) {
   );
 }
 
-// Track users/groups on every message
+// --- User & Group Tracking ---
 bot.use((ctx, next) => {
   if (ctx.from && ctx.from.id) global.users.add(ctx.from.id);
   if (ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup')) global.groups.add(ctx.chat.id);
@@ -89,7 +91,7 @@ bot.use((ctx, next) => {
 bot.start(sendMenu);
 bot.command('menu', sendMenu);
 
-// Dynamic plugin loader (supports nested folders)
+// --- Dynamic Plugin Loader (supports nested folders) ---
 function loadPlugins(bot, folder) {
   fs.readdirSync(folder).forEach(file => {
     const fullPath = path.join(folder, file);
@@ -109,7 +111,7 @@ function loadPlugins(bot, folder) {
 }
 loadPlugins(bot, path.join(__dirname, 'plugins'));
 
-// Broadcast for owner only
+// --- Broadcast for owner only ---
 bot.hears(/^\.broadcast (.+)/, async ctx => {
   if (String(ctx.from.id) !== process.env.OWNER_ID) return;
   const msg = ctx.match[1];
@@ -140,12 +142,24 @@ bot.hears(/^\.broadcast (.+)/, async ctx => {
   await ctx.reply('✅ Broadcast sent!');
 });
 
-// Group/channel support
+// --- Group/channel support ---
 bot.on('new_chat_members', ctx => sendMenu(ctx));
 bot.on('group_chat_created', ctx => sendMenu(ctx));
 bot.on('channel_post', ctx => sendMenu(ctx));
 
-bot.launch();
+// --- Express Server for Port Binding (Render requirement) ---
+const app = express();
+const PORT = process.env.PORT || 3000;
 
+app.get('/', (req, res) => {
+  res.send("CYBIX V1 Telegram Bot is running!");
+});
+
+app.listen(PORT, () => {
+  console.log(`Express server listening on port ${PORT}`);
+  bot.launch().then(() => console.log("CYBIX V1 Telegram Bot started!"));
+});
+
+// --- Graceful Shutdown ---
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
