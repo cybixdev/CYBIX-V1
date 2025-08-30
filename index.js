@@ -2,18 +2,18 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 const path = require('path');
-const express = require('express');
 const config = require('./config');
-const bot = new Telegraf(process.env.BOT_TOKEN);
 
 global.users = new Set();
 global.groups = new Set();
+
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // --- Telegram Bot Menu ---
 function sendMenu(ctx) {
   const menu =
 `╭━━━━━━━【 CYBIX V1 】━━━━━━━
-┃ Hello @${ctx.from.username || ctx.from.first_name} how are you doing 
+┃ @${ctx.from.username || ctx.from.first_name}
 ┣━ users: ${global.users.size}
 ┣━ groups: ${global.groups.size}
 ┣━ prefix: "."
@@ -147,18 +147,21 @@ bot.on('new_chat_members', ctx => sendMenu(ctx));
 bot.on('group_chat_created', ctx => sendMenu(ctx));
 bot.on('channel_post', ctx => sendMenu(ctx));
 
-// --- Express Server for Port Binding (Render requirement) ---
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-  res.send("CYBIX V1 Telegram Bot is running!");
-});
-
-app.listen(PORT, () => {
-  console.log(`Express server listening on port ${PORT}`);
+// --- Render Port Compatibility (optional for health check, but not required) ---
+if (process.env.PORT) {
+  // Start a minimal HTTP server for Render port binding
+  const http = require('http');
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, {'Content-Type': 'text/plain'});
+    res.end('CYBIX V1 Telegram Bot is running!\n');
+  });
+  server.listen(process.env.PORT, () => {
+    console.log(`HTTP health-check server listening on port ${process.env.PORT}`);
+    bot.launch().then(() => console.log("CYBIX V1 Telegram Bot started!"));
+  });
+} else {
   bot.launch().then(() => console.log("CYBIX V1 Telegram Bot started!"));
-});
+}
 
 // --- Graceful Shutdown ---
 process.once('SIGINT', () => bot.stop('SIGINT'));
