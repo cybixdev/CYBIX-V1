@@ -1,5 +1,5 @@
 services:
-  - type: web
+  - type: worker
     name: cybix-v1
     env: node
     plan: starter
