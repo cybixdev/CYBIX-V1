@@ -1,26 +1,16 @@
 {
   "name": "cybix-v1-telegram-bot",
   "version": "1.0.0",
-  "description": "CYBIX V1 - Ultimate Telegram bot. AI, downloads, NSFW, adult, developer tools, stats, and more!",
+  "description": "CYBIX V1 - Telegram bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": [
-    "telegram",
-    "bot",
-    "ai",
-    "download",
-    "nsfw",
-    "adult",
-    "cybix",
-    "telegraf"
-  ],
-  "author": "cybixdev",
-  "license": "MIT",
   "dependencies": {
     "axios": "^1.6.7",
     "dotenv": "^16.3.1",
-    "telegraf": "^4.16.0"
-  }
+    "telegraf": "^4.16.0",
+    "express": "^4.18.2"
+  },
+  "license": "MIT"
 }
