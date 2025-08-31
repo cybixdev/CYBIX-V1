@@ -2,7 +2,6 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 const path = require('path');
-const express = require('express');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID_RAW = process.env.OWNER_ID;
@@ -21,7 +20,7 @@ if (!OWNER_ID) {
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Ensure folders & default JSON files exist
+// Ensure directories & default JSON files exist
 const ROOT = __dirname;
 const UTILS_DIR = path.join(ROOT, 'utils');
 const PLUGINS_DIR = path.join(ROOT, 'plugins');
@@ -39,23 +38,20 @@ ensureJson(path.join(UTILS_DIR, 'users.json'), '[]');
 ensureJson(path.join(UTILS_DIR, 'groups.json'), '[]');
 ensureJson(path.join(UTILS_DIR, 'premium.json'), '[]');
 
-// Safe sendBannerAndButtons: never throws outward (attempt photo -> fallback -> silent)
+// Safe sendBannerAndButtons: never throws outward
 const sendBannerAndButtons = async (ctx, caption, extra = {}) => {
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.url('Telegram Channel', 'https://t.me/cybixtech'), Markup.button.url('Support', 'https://t.me/cybixtech')]
   ]);
   try {
     if (ctx && typeof ctx.replyWithPhoto === 'function') {
-      // Try to send banner image with caption and keyboard
       return await ctx.replyWithPhoto(BANNER_URL, { caption, ...extra, ...keyboard });
     }
     if (ctx && typeof ctx.reply === 'function') {
       return await ctx.reply(caption, { ...extra, ...keyboard });
     }
   } catch (err) {
-    // Log internal error, do not send error details to user
     console.error('sendBannerAndButtons error:', err?.stack || err?.message || err);
-    // Best-effort fallback: try a very simple text reply without keyboard (still safe)
     try {
       if (ctx && typeof ctx.reply === 'function') {
         await ctx.reply(String(caption).slice(0, 4000));
@@ -66,12 +62,11 @@ const sendBannerAndButtons = async (ctx, caption, extra = {}) => {
   }
 };
 
-// Per-update error middleware: catches and logs plugin/runtime errors, does NOT reply to users
+// Per-update error middleware: logs errors but does NOT reply to users
 bot.use(async (ctx, next) => {
   try {
     await next();
   } catch (err) {
-    // Log enough context to debug in server logs, but NEVER reply the error to users
     try {
       console.error('Update handler error:', {
         updateType: ctx.updateType,
@@ -82,11 +77,11 @@ bot.use(async (ctx, next) => {
     } catch (loggingErr) {
       console.error('Error while logging update error:', loggingErr?.message || loggingErr);
     }
-    // swallow the error so bot.catch won't be invoked with user-facing replies
+    // swallow error (do not forward to user)
   }
 });
 
-// Track users and groups safely (no throws)
+// Track users and groups safely
 bot.on('message', async ctx => {
   try {
     const user = ctx.from;
@@ -115,7 +110,7 @@ bot.on('message', async ctx => {
   }
 });
 
-// Robust plugin loader: loads every .js from plugins dir; skips/continues on errors
+// Robust plugin loader
 const loadPlugins = () => {
   let list = [];
   try { list = fs.readdirSync(PLUGINS_DIR).filter(f => f.endsWith('.js')); } catch (e) { console.error('Failed to read plugins directory:', e?.message || e); return; }
@@ -127,7 +122,6 @@ const loadPlugins = () => {
         console.warn(`Plugin ${file} skipped: module.exports is not a function`);
         continue;
       }
-      // Call plugin with (bot, sendBannerAndButtons, OWNER_ID) signature if declared
       try {
         if (plugin.length === 3) plugin(bot, sendBannerAndButtons, OWNER_ID);
         else if (plugin.length === 2) plugin(bot, sendBannerAndButtons);
@@ -144,7 +138,7 @@ const loadPlugins = () => {
 
 loadPlugins();
 
-// bot.catch logs only, no user-facing reply EVER
+// bot.catch logs only, never replies to user
 bot.catch((err, ctx) => {
   try {
     console.error('bot.catch - unhandled error:', {
@@ -152,23 +146,28 @@ bot.catch((err, ctx) => {
       from: ctx?.from ? { id: ctx.from.id, username: ctx.from.username } : null,
       error: err?.stack || err?.message || err
     });
-    // Intentionally do NOT send any reply to the user here.
   } catch (e) {
     console.error('Error inside bot.catch:', e?.message || e);
   }
 });
 
-// Small express health endpoint for Render (optional)
+// Optional express health server: require express only if present (no crash if missing)
+let expressAppStarted = false;
 try {
+  // try to require express; if it's not installed, this will throw and we skip creating the server
+  const express = require('express');
   const app = express();
   app.get('/', (req, res) => res.send('CYBIX V1 - OK'));
   app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
-  app.listen(PORT, () => console.log(`Health server listening on port ${PORT}`));
+  app.listen(PORT, () => {
+    expressAppStarted = true;
+    console.log(`Health server listening on port ${PORT}`);
+  });
 } catch (e) {
-  console.error('Failed to start health server:', e?.message || e);
+  console.warn('Express not installed or failed to start - skipping health server. To enable it, run: npm install express');
 }
 
-// Global unhandled rejection / uncaught exception handlers: log, don't reply to users
+// Global unhandled problem logging (do not reply to users)
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
 });
@@ -180,13 +179,14 @@ process.on('uncaughtException', (err) => {
   try {
     await bot.launch();
     console.log('CYBIX V1 Bot launched and running.');
+    if (!expressAppStarted) console.log('Note: health server not running (express missing).');
   } catch (e) {
     console.error('Failed to launch bot:', e?.stack || e?.message || e);
     process.exit(1);
   }
 })();
 
-// Graceful shutdown
+// graceful shutdown
 ['SIGINT', 'SIGTERM'].forEach(sig => {
   process.once(sig, async () => {
     console.log(`${sig} received, stopping bot...`);
