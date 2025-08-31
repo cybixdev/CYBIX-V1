@@ -1,3 +1,14 @@
+/**
+ * CYBIX V1 - Robust entrypoint with safe JSON handling
+ *
+ * Fixes:
+ * - "users.find is not a function" by validating and sanitizing utils JSON files
+ * - Ensures user/group tracking never throws and cannot block other handlers
+ * - Keeps previous hardening: no user-facing raw error replies, optional express health server
+ *
+ * Replace your current index.js with this file, restart the service on Render, and watch logs.
+ */
+
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
@@ -20,25 +31,74 @@ if (!OWNER_ID) {
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Ensure directories & default JSON files exist
+// Paths
 const ROOT = __dirname;
 const UTILS_DIR = path.join(ROOT, 'utils');
 const PLUGINS_DIR = path.join(ROOT, 'plugins');
 
+// Ensure folders exist
 if (!fs.existsSync(UTILS_DIR)) fs.mkdirSync(UTILS_DIR, { recursive: true });
 if (!fs.existsSync(PLUGINS_DIR)) fs.mkdirSync(PLUGINS_DIR, { recursive: true });
 
-const ensureJson = (p, defaultContent = '[]') => {
-  if (!fs.existsSync(p)) {
-    try { fs.writeFileSync(p, defaultContent, 'utf8'); }
-    catch (e) { console.error(`Failed to create ${p}:`, e?.message || e); }
+// Safe JSON helpers
+function safeReadJson(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    const raw = fs.readFileSync(filePath, 'utf8');
+    if (!raw || !raw.trim()) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error(`safeReadJson parse error for ${filePath}:`, e?.message || e);
+    return null;
   }
-};
-ensureJson(path.join(UTILS_DIR, 'users.json'), '[]');
-ensureJson(path.join(UTILS_DIR, 'groups.json'), '[]');
-ensureJson(path.join(UTILS_DIR, 'premium.json'), '[]');
+}
 
-// Safe sendBannerAndButtons: never throws outward
+function safeWriteJson(filePath, data) {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    console.error(`safeWriteJson write error for ${filePath}:`, e?.message || e);
+    return false;
+  }
+}
+
+/**
+ * Ensure the given utils file contains an Array.
+ * If file is missing or corrupt or contains a non-array, this will rewrite it to [].
+ * It attempts to salvage common wrapped shapes like { users: [...] } or { data: [...] }.
+ */
+function ensureArrayFile(filePath) {
+  let parsed = safeReadJson(filePath);
+  if (Array.isArray(parsed)) return; // OK
+  
+  // salvage attempt
+  if (parsed && typeof parsed === 'object') {
+    if (Array.isArray(parsed.users)) {
+      safeWriteJson(filePath, parsed.users);
+      console.warn(`${path.basename(filePath)} contained { users: [...] } — salvaged to array.`);
+      return;
+    }
+    if (Array.isArray(parsed.data)) {
+      safeWriteJson(filePath, parsed.data);
+      console.warn(`${path.basename(filePath)} contained { data: [...] } — salvaged to array.`);
+      return;
+    }
+  }
+  
+  // Overwrite with empty array if anything else
+  console.warn(`${path.basename(filePath)} is missing or invalid — resetting to []`);
+  safeWriteJson(filePath, []);
+}
+
+// Ensure required files exist and are valid arrays
+ensureArrayFile(path.join(UTILS_DIR, 'users.json'));
+ensureArrayFile(path.join(UTILS_DIR, 'groups.json'));
+ensureArrayFile(path.join(UTILS_DIR, 'premium.json'));
+
+// sendBannerAndButtons: defensive (never throw)
 const sendBannerAndButtons = async (ctx, caption, extra = {}) => {
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.url('Telegram Channel', 'https://t.me/cybixtech'), Markup.button.url('Support', 'https://t.me/cybixtech')]
@@ -48,13 +108,13 @@ const sendBannerAndButtons = async (ctx, caption, extra = {}) => {
       return await ctx.replyWithPhoto(BANNER_URL, { caption, ...extra, ...keyboard });
     }
     if (ctx && typeof ctx.reply === 'function') {
-      return await ctx.reply(caption, { ...extra, ...keyboard });
+      return await ctx.reply(String(caption).slice(0, 4096), { ...extra, ...keyboard });
     }
   } catch (err) {
-    console.error('sendBannerAndButtons error:', err?.stack || err?.message || err);
+    console.error('sendBannerAndButtons error:', err?.message || err);
     try {
       if (ctx && typeof ctx.reply === 'function') {
-        await ctx.reply(String(caption).slice(0, 4000));
+        await ctx.reply(String(caption).slice(0, 1900));
       }
     } catch (e) {
       console.error('sendBannerAndButtons fallback failed:', e?.message || e);
@@ -62,7 +122,7 @@ const sendBannerAndButtons = async (ctx, caption, extra = {}) => {
   }
 };
 
-// Per-update error middleware: logs errors but does NOT reply to users
+// Per-update middleware: catch plugin errors and log only (do not reply to users)
 bot.use(async (ctx, next) => {
   try {
     await next();
@@ -75,51 +135,67 @@ bot.use(async (ctx, next) => {
         error: err?.stack || err?.message || err
       });
     } catch (loggingErr) {
-      console.error('Error while logging update error:', loggingErr?.message || loggingErr);
+      console.error('Failed to log update error:', loggingErr?.message || loggingErr);
     }
-    // swallow error (do not forward to user)
+    // swallow the error to avoid any user-facing generic error messages
   }
 });
 
-// Track users and groups safely
+// User/group tracking - made fully defensive and non-blocking
 bot.on('message', async ctx => {
   try {
     const user = ctx.from;
     if (!user || !user.id) return;
+    
     const usersPath = path.join(UTILS_DIR, 'users.json');
     const groupsPath = path.join(UTILS_DIR, 'groups.json');
     
-    let users = [];
-    try { users = JSON.parse(fs.readFileSync(usersPath, 'utf8') || '[]'); } catch { users = []; }
-    if (!users.find(u => String(u.id) === String(user.id))) {
-      users.push({ id: user.id, username: user.username || null, first_name: user.first_name || null });
-      try { fs.writeFileSync(usersPath, JSON.stringify(users, null, 2), 'utf8'); } catch (e) { console.error('Failed to write users.json:', e?.message || e); }
+    // Read and sanitize users array
+    let users = safeReadJson(usersPath);
+    if (!Array.isArray(users)) {
+      console.warn('users.json invalid at message-time — sanitizing');
+      ensureArrayFile(usersPath);
+      users = [];
     }
     
+    // Add user if missing
+    const existsUser = users.find(u => String(u.id) === String(user.id));
+    if (!existsUser) {
+      users.push({ id: user.id, username: user.username || null, first_name: user.first_name || null, added_at: Date.now() });
+      safeWriteJson(usersPath, users);
+    }
+    
+    // Groups
     const chatType = ctx.chat?.type;
     if (chatType === 'group' || chatType === 'supergroup') {
-      let groups = [];
-      try { groups = JSON.parse(fs.readFileSync(groupsPath, 'utf8') || '[]'); } catch { groups = []; }
-      if (!groups.find(g => String(g.id) === String(ctx.chat.id))) {
-        groups.push({ id: ctx.chat.id, title: ctx.chat.title || null });
-        try { fs.writeFileSync(groupsPath, JSON.stringify(groups, null, 2), 'utf8'); } catch (e) { console.error('Failed to write groups.json:', e?.message || e); }
+      let groups = safeReadJson(groupsPath);
+      if (!Array.isArray(groups)) {
+        console.warn('groups.json invalid at message-time — sanitizing');
+        ensureArrayFile(groupsPath);
+        groups = [];
+      }
+      const existsGroup = groups.find(g => String(g.id) === String(ctx.chat.id));
+      if (!existsGroup) {
+        groups.push({ id: ctx.chat.id, title: ctx.chat.title || null, added_at: Date.now() });
+        safeWriteJson(groupsPath, groups);
       }
     }
   } catch (e) {
+    // Log only — MUST NOT throw
     console.error('User/group tracking error:', e?.message || e);
   }
 });
 
-// Robust plugin loader
+// Plugin loader (robust)
 const loadPlugins = () => {
-  let list = [];
-  try { list = fs.readdirSync(PLUGINS_DIR).filter(f => f.endsWith('.js')); } catch (e) { console.error('Failed to read plugins directory:', e?.message || e); return; }
-  for (const file of list) {
+  let files = [];
+  try { files = fs.readdirSync(PLUGINS_DIR).filter(f => f.endsWith('.js')); } catch (e) { console.error('Failed to read plugins dir:', e?.message || e); return; }
+  for (const file of files) {
     const full = path.join(PLUGINS_DIR, file);
     try {
       const plugin = require(full);
       if (typeof plugin !== 'function') {
-        console.warn(`Plugin ${file} skipped: module.exports is not a function`);
+        console.warn(`Skipping plugin ${file}: module.exports is not a function`);
         continue;
       }
       try {
@@ -138,7 +214,7 @@ const loadPlugins = () => {
 
 loadPlugins();
 
-// bot.catch logs only, never replies to user
+// bot.catch: log only
 bot.catch((err, ctx) => {
   try {
     console.error('bot.catch - unhandled error:', {
@@ -151,10 +227,9 @@ bot.catch((err, ctx) => {
   }
 });
 
-// Optional express health server: require express only if present (no crash if missing)
+// Optional lightweight health server only if express is installed
 let expressAppStarted = false;
 try {
-  // try to require express; if it's not installed, this will throw and we skip creating the server
   const express = require('express');
   const app = express();
   app.get('/', (req, res) => res.send('CYBIX V1 - OK'));
@@ -164,10 +239,10 @@ try {
     console.log(`Health server listening on port ${PORT}`);
   });
 } catch (e) {
-  console.warn('Express not installed or failed to start - skipping health server. To enable it, run: npm install express');
+  console.log('Express not present; skipping health server (this is fine).');
 }
 
-// Global unhandled problem logging (do not reply to users)
+// Global unhandled logging
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);
 });
@@ -175,18 +250,19 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err?.stack || err?.message || err);
 });
 
+// Launch bot
 (async () => {
   try {
     await bot.launch();
     console.log('CYBIX V1 Bot launched and running.');
-    if (!expressAppStarted) console.log('Note: health server not running (express missing).');
+    if (!expressAppStarted) console.log('Health server not running (express not installed).');
   } catch (e) {
     console.error('Failed to launch bot:', e?.stack || e?.message || e);
     process.exit(1);
   }
 })();
 
-// graceful shutdown
+// Graceful shutdown
 ['SIGINT', 'SIGTERM'].forEach(sig => {
   process.once(sig, async () => {
     console.log(`${sig} received, stopping bot...`);
@@ -195,4 +271,5 @@ process.on('uncaughtException', (err) => {
   });
 });
 
-module.exports = { bot, sendBannerAndButtons };
+// Export for tests or external use
+module.exports = { bot, sendBannerAndButtons, ensureArrayFile };
