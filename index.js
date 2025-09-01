@@ -7,17 +7,21 @@ const os = require('os');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID || "0";
 const BANNER = 'https://i.postimg.cc/L4NwW5WY/boykaxd.jpg';
+const PORT = process.env.PORT || 3000;
 
 const CHANNEL_BUTTONS = [
   [Markup.button.url('Whatsapp Channel', 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X')],
   [Markup.button.url('Telegram Channel', 'https://t.me/cybixtech')]
 ];
 
-if (!BOT_TOKEN || !OWNER_ID) throw new Error('BOT_TOKEN or OWNER_ID missing in .env');
+if (!BOT_TOKEN || !OWNER_ID) {
+  console.error('❌ BOT_TOKEN or OWNER_ID missing in .env');
+  process.exit(1);
+}
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Recursively load plugins
+// --- Plugin Loader ---
 function loadPlugins(pluginDir) {
   fs.readdirSync(pluginDir, { withFileTypes: true }).forEach(entry => {
     const fullPath = path.join(pluginDir, entry.name);
@@ -26,14 +30,18 @@ function loadPlugins(pluginDir) {
     } else if (entry.isFile() && entry.name.endsWith('.js')) {
       const plugin = require(fullPath);
       if (typeof plugin === 'function') {
-        plugin(bot, { OWNER_ID, BANNER, CHANNEL_BUTTONS });
+        try {
+          plugin(bot, { OWNER_ID, BANNER, CHANNEL_BUTTONS });
+        } catch (e) {
+          console.error(`❌ Error loading plugin ${fullPath}:`, e.message);
+        }
       }
     }
   });
 }
 loadPlugins(path.join(__dirname, 'plugins'));
 
-// Menu helpers
+// --- Helpers ---
 function formatMemory(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
@@ -55,16 +63,14 @@ function countPlugins(dir) {
   return count;
 }
 
-// Menu command
-bot.command(['start', 'menu'], async ctx => sendMenu(ctx));
-bot.hears(/^\.menu$/i, async ctx => sendMenu(ctx));
-
+// --- Main Menu Handler ---
 async function sendMenu(ctx) {
-  const user = ctx.from;
-  const mem = process.memoryUsage();
-  const pluginCount = countPlugins(path.join(__dirname, 'plugins'));
-  const caption =
-`╭━━━[ 𝐂𝐘𝐁𝐈𝐗 V1 MENU ]━━━
+  try {
+    const user = ctx.from;
+    const mem = process.memoryUsage();
+    const pluginCount = countPlugins(path.join(__dirname, 'plugins'));
+    const caption =
+`╭━━━[ 𝐂𝐘𝐁𝐈𝐗 𝐕1 MAIN MENU ]━━━
 ┃ 👤 User: ${user.username ? '@' + user.username : user.first_name}
 ┃ 🆔 ID: ${user.id}
 ┃ 👑 Owner: @cybixdev
@@ -172,36 +178,65 @@ async function sendMenu(ctx) {
 
 ▣ Powered by *CYBIX TECH* 👹💀`;
 
-  await ctx.replyWithPhoto(
-    { url: BANNER },
-    {
-      caption,
-      parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard(CHANNEL_BUTTONS)
-    }
-  );
+    await ctx.replyWithPhoto(
+      { url: BANNER },
+      {
+        caption,
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(CHANNEL_BUTTONS)
+      }
+    );
+  } catch (e) {
+    await ctx.reply('❌ Error displaying menu.');
+  }
 }
 
-// Fallback for unknown commands
+// --- Command Triggers ---
+// Responds to both /start, .start, /menu, .menu
+bot.command(['start', 'menu'], sendMenu);
+bot.hears(/^\.menu$/i, sendMenu);
+bot.hears(/^\.start$/i, sendMenu);
+
+// --- Fallback for Unknown Commands ---
 bot.on('text', async ctx => {
   if (!ctx.message.text.startsWith('.')) return;
   await ctx.replyWithPhoto(
     { url: BANNER },
     {
-      caption: '❌ Unknown command. Type .menu to see all available commands.',
+      caption: '❌ Unknown command. Type .menu or /menu to see all available commands.',
       ...Markup.inlineKeyboard(CHANNEL_BUTTONS)
     }
   );
 });
 
-// Error handling
+// --- Error Handling ---
 bot.catch((err, ctx) => {
   console.error(`[CYBIX] Error for ${ctx.updateType}`, err);
 });
 
-bot.launch();
-console.log('CYBIX V1 started!');
+// --- Start Bot (with PORT support for Render/Heroku/etc) ---
+(async () => {
+  try {
+    if (process.env.WEBHOOK_URL) {
+      // For platforms requiring webhook (like Render, Vercel)
+      bot.launch({
+        webhook: {
+          domain: process.env.WEBHOOK_URL,
+          port: PORT
+        }
+      });
+      console.log(`CYBIX V1 started with Webhook! PORT: ${PORT}`);
+    } else {
+      // Standard polling (Termux, localhost, etc)
+      await bot.launch();
+      console.log('CYBIX V1 started with polling!');
+    }
+  } catch (e) {
+    console.error('❌ Failed to launch bot:', e.message);
+    process.exit(1);
+  }
+})();
 
-// Graceful stop
+// --- Graceful Shutdown ---
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
