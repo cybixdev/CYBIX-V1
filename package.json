@@ -1,6 +1,6 @@
 {
   "name": "cybix-v3",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "index.js",
   "description": "CYBIX V3 - The ultimate Telegram bot with premium, NSFW, hentai, anime, adult, and utility features.",
   "scripts": {
@@ -10,5 +10,8 @@
     "axios": "^1.6.8",
     "dotenv": "^16.4.5",
     "node-telegram-bot-api": "^0.61.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
