@@ -41,7 +41,7 @@ function loadPlugins(pluginDir) {
 }
 loadPlugins(path.join(__dirname, 'plugins'));
 
-// --- Menu Helper Functions ---
+// --- Helpers ---
 function formatMemory(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
@@ -64,14 +64,14 @@ function countPlugins(dir) {
   return count;
 }
 
-// ---- MAIN MENU HANDLER (NO STRUCTURE CHANGES) ----
+// ---- MAIN MENU HANDLER ----
 async function sendMenu(ctx) {
   try {
     const user = ctx.from;
     const mem = process.memoryUsage();
     const pluginCount = countPlugins(path.join(__dirname, 'plugins'));
 
-    // -- YOUR MENU STRUCTURE, UNCHANGED --
+    // Build menu as a single caption string (user+memory+menu)
     const menuText =
 `╭━━━[ 𝐂𝐘𝐁𝐈𝐗 𝐕1 MAIN MENU ]━━━
 ┃ 👤 User: ${user.username ? '@' + user.username : user.first_name}
@@ -181,18 +181,20 @@ async function sendMenu(ctx) {
 
 ▣ Powered by *CYBIX TECH* 👹💀`;
 
-    // Telegram photo caption max 1024 chars
+    // If menuText is too long, Telegram will throw, and you will see an error in your logs.
+    if (menuText.length > 1024) {
+      await ctx.reply('❌ Menu too long for Telegram photo caption. Please shorten your menu or send it as a text message instead.');
+      return;
+    }
+
     await ctx.replyWithPhoto(
       BANNER,
       {
-        caption: menuText.slice(0, 1024),
+        caption: menuText,
         parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: CHANNEL_BUTTONS }
       }
     );
-    if (menuText.length > 1024) {
-      await ctx.reply(menuText.slice(1024), { parse_mode: 'Markdown' });
-    }
   } catch (e) {
     await ctx.reply("❌ Error displaying menu: " + e.message);
   }
