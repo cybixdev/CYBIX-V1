@@ -6,7 +6,7 @@ const path = require('path');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID || "0";
 const PORT = process.env.PORT || 3000;
-const BANNER = 'https://i.postimg.cc/L4NwW5WY/boykaxd.jpg';
+const BANNER = 'https://i.imgur.com/X34jPIr.jpeg';
 
 const CHANNEL_BUTTONS = [
   [Markup.button.url('Whatsapp Channel', 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X')],
