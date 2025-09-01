@@ -3,8 +3,13 @@ const path = require("path");
 const premiumFile = path.join(__dirname, "../data/premium.json");
 
 function loadPremium() {
-  try { return JSON.parse(fs.readFileSync(premiumFile, "utf8")); }
-  catch { return []; }
+  try {
+    const data = fs.readFileSync(premiumFile, "utf8");
+    const arr = JSON.parse(data);
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
 }
 function savePremium(users) { fs.writeFileSync(premiumFile, JSON.stringify(users, null, 2)); }
 function isPremium(id) { return loadPremium().includes(Number(id)); }
