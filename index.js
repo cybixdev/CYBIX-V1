@@ -13,7 +13,7 @@ const CHANNEL_BUTTONS = [
   [Markup.button.url('Telegram Channel', 'https://t.me/cybixtech')]
 ];
 
-if (!BOT_TOKEN || !OWNER_ID) {
+if (!BOT_TOKEN || !OWNER_ID || OWNER_ID === "0") {
   console.error('❌ BOT_TOKEN or OWNER_ID missing in .env');
   process.exit(1);
 }
@@ -41,7 +41,7 @@ function loadPlugins(pluginDir) {
 }
 loadPlugins(path.join(__dirname, 'plugins'));
 
-// --- Helpers ---
+// --- Helper Functions ---
 function formatMemory(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
@@ -71,9 +71,8 @@ async function sendMenu(ctx) {
     const mem = process.memoryUsage();
     const pluginCount = countPlugins(path.join(__dirname, 'plugins'));
 
-    // Build menu as a single caption string (user+memory+menu)
     const menuText =
-`╭━━━[ 𝐂𝐘𝐁𝐈𝐗 𝐕1 MAIN MENU ]━━━
+`╭━━━[ 𝐂𝐘𝐁𝐈𝐗 𝐕1 MENU ]━━━
 ┃ 👤 User: ${user.username ? '@' + user.username : user.first_name}
 ┃ 🆔 ID: ${user.id}
 ┃ 👑 Owner: @cybixdev
@@ -181,20 +180,17 @@ async function sendMenu(ctx) {
 
 ▣ Powered by *CYBIX TECH* 👹💀`;
 
-    // If menuText is too long, Telegram will throw, and you will see an error in your logs.
-    if (menuText.length > 2000) {
-      await ctx.reply('❌ Menu too long for Telegram photo caption. Please shorten your menu or send it as a text message instead.');
-      return;
-    }
-
+    // Banner only (no caption, so no 1024 char limit)
     await ctx.replyWithPhoto(
       BANNER,
       {
-        caption: menuText,
-        parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: CHANNEL_BUTTONS }
       }
     );
+
+    // Full menu as a single text message (never split, always full)
+    await ctx.reply(menuText, { parse_mode: 'Markdown' });
+
   } catch (e) {
     await ctx.reply("❌ Error displaying menu: " + e.message);
   }
