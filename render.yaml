@@ -1,11 +1,10 @@
 services:
   - type: web
-    name: cybix-v1-telegram-bot
+    name: cybix-v3-bot
     env: node
     plan: free
     buildCommand: "npm install"
     startCommand: "npm start"
-    autoDeploy: true
     envVars:
       - key: BOT_TOKEN
         sync: false
