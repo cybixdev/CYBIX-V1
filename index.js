@@ -182,7 +182,7 @@ async function sendMenu(ctx) {
 ▣ Powered by *CYBIX TECH* 👹💀`;
 
     // If menuText is too long, Telegram will throw, and you will see an error in your logs.
-    if (menuText.length > 1024) {
+    if (menuText.length > 2000) {
       await ctx.reply('❌ Menu too long for Telegram photo caption. Please shorten your menu or send it as a text message instead.');
       return;
     }
