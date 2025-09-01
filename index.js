@@ -1,115 +1,207 @@
-require("dotenv").config();
-const TelegramBot = require("node-telegram-bot-api");
-const fs = require("fs");
-const path = require("path");
-const { getBanner } = require("./utils/banner");
-const { getChannelButtons } = require("./utils/buttons");
-const { isPremium, addPremium, removePremium, listPremium } = require("./utils/premium");
-const config = require("./config");
+require('dotenv').config();
+const { Telegraf, Markup } = require('telegraf');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) throw new Error("BOT_TOKEN missing in .env");
+const OWNER_ID = process.env.OWNER_ID || "0";
+const BANNER = 'https://i.postimg.cc/L4NwW5WY/boykaxd.jpg';
 
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+const CHANNEL_BUTTONS = [
+  [Markup.button.url('Whatsapp Channel', 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X')],
+  [Markup.button.url('Telegram Channel', 'https://t.me/cybixtech')]
+];
 
-global.users = new Set();
-global.groups = new Set();
+if (!BOT_TOKEN || !OWNER_ID) throw new Error('BOT_TOKEN or OWNER_ID missing in .env');
 
-bot.on("message", (msg) => {
-  if (msg.chat.type === "private") global.users.add(msg.chat.id);
-  if (["group", "supergroup"].includes(msg.chat.type)) global.groups.add(msg.chat.id);
-});
+const bot = new Telegraf(BOT_TOKEN);
 
-function buildMenuCaption(ctx) {
-  return `╭━━━━【 CYBIX V3 】━━━━
-┃ @${ctx.from.username || ctx.from.first_name}
-┣━ users: ${global.users.size}
-┣━ groups: ${global.groups.size}
-┣━ prefix: "."
-┣━ owner: ${config.developer}
-╰━━━━━━━━━━━━━━━━━━━━━`;
-}
-
-// Load plugins recursively
-function loadPlugins(dir, plugins = {}) {
-  fs.readdirSync(dir).forEach(file => {
-    const fullPath = path.join(dir, file);
-    if (fs.statSync(fullPath).isDirectory()) loadPlugins(fullPath, plugins);
-    else if (file.endsWith(".js")) {
-      const plugin = require("./" + fullPath.replace(/\\/g, "/"));
-      if (plugin.command) plugins[plugin.command] = plugin;
-      if (plugin.aliases && Array.isArray(plugin.aliases)) {
-        for (const alias of plugin.aliases) plugins[alias] = plugin;
+// Recursively load plugins
+function loadPlugins(pluginDir) {
+  fs.readdirSync(pluginDir, { withFileTypes: true }).forEach(entry => {
+    const fullPath = path.join(pluginDir, entry.name);
+    if (entry.isDirectory()) {
+      loadPlugins(fullPath);
+    } else if (entry.isFile() && entry.name.endsWith('.js')) {
+      const plugin = require(fullPath);
+      if (typeof plugin === 'function') {
+        plugin(bot, { OWNER_ID, BANNER, CHANNEL_BUTTONS });
       }
     }
   });
-  return plugins;
 }
-const plugins = loadPlugins("plugins");
+loadPlugins(path.join(__dirname, 'plugins'));
 
-const menuCaptions = require("./config").menus;
-const allMenus = {
-  ".menu": "main",
-  ".nsfwmenu": "nsfw",
-  ".adultmenu": "adult",
-  ".animemenu": "anime",
-  ".hentaimenu": "hentai",
-  ".premium": "premium",
-  ".devmenu": "developer"
-};
-
-Object.entries(allMenus).forEach(([cmd, key]) => {
-  bot.onText(new RegExp(`^\\${cmd}`, "i"), async (msg) => {
-    const bannerUrl = getBanner();
-    const buttons = getChannelButtons();
-    const menuCaption =
-      buildMenuCaption(msg) + "\n" + menuCaptions[key] + "\n\n▣ powered by *CYBIX TECH* 👹💀";
-    await bot.sendPhoto(msg.chat.id, bannerUrl, {
-      caption: menuCaption,
-      parse_mode: "Markdown",
-      reply_markup: buttons,
-    });
+// Menu helpers
+function formatMemory(bytes) {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+function formatUptime() {
+  let sec = process.uptime() | 0;
+  let [h, m, s] = [
+    Math.floor(sec / 3600),
+    Math.floor((sec % 3600) / 60),
+    sec % 60
+  ];
+  return `${h}h ${m}m ${s}s`;
+}
+function countPlugins(dir) {
+  let count = 0;
+  fs.readdirSync(dir, { withFileTypes: true }).forEach(entry => {
+    if (entry.isDirectory()) count += countPlugins(path.join(dir, entry.name));
+    else if (entry.isFile() && entry.name.endsWith('.js')) count++;
   });
+  return count;
+}
+
+// Menu command
+bot.command(['start', 'menu'], async ctx => sendMenu(ctx));
+bot.hears(/^\.menu$/i, async ctx => sendMenu(ctx));
+
+async function sendMenu(ctx) {
+  const user = ctx.from;
+  const mem = process.memoryUsage();
+  const pluginCount = countPlugins(path.join(__dirname, 'plugins'));
+  const caption =
+`╭━━━[ 𝐂𝐘𝐁𝐈𝐗 V1 MENU ]━━━
+┃ 👤 User: ${user.username ? '@' + user.username : user.first_name}
+┃ 🆔 ID: ${user.id}
+┃ 👑 Owner: @cybixdev
+┃ 🕒 Uptime: ${formatUptime()}
+┃ 💾 Memory: ${formatMemory(mem.rss)}
+┃ ⚙️ Plugins: ${pluginCount}
+┃ ⏳ Prefix: .
+╰━━━━━━━━━━━━━━━
+
+╭━━【 AI MENU 】━━
+┃ • .chatgpt
+┃ • .deepseek
+┃ • .blackbox
+┃ • .bard
+┃ • .phind
+╰━━━━━━━━━━━━━━━
+
+╭━━【 DOWNLOAD MENU 】━━
+┃ • .apk
+┃ • .play
+┃ • .video
+┃ • .gitclone
+┃ • .instadl
+┃ • .ytmp3
+╰━━━━━━━━━━━━━━━
+
+╭━━【 NSFW MENU 】━━
+┃ • .nsfwpic
+┃ • .nsfwgif
+┃ • .4kporn
+┃ • .ass
+┃ • .boobs
+┃ • .thighs
+┃ • .cum
+┃ • .lesbian
+┃ • .milf
+┃ • .blowjob
+┃ • .bdsm
+┃ • .pussy
+┃ • .publicsex
+┃ • .anal
+┃ • .cumslut
+┃ • .spank
+┃ • .dick
+┃ • .cosplay
+┃ • .facesitting
+┃ • .randomnsfw
+╰━━━━━━━━━━━━━━━
+
+╭━━【 PORN MENU 】━━
+┃ • .xnxx
+┃ • .pornhub
+┃ • .redgifs
+┃ • .lesbianporn
+┃ • .triplelesbian
+┃ • .gayporn
+┃ • .asian
+┃ • .ebony
+┃ • .bear
+┃ • .kissing
+┃ • .futa
+┃ • .celebrity
+╰━━━━━━━━━━━━━━━
+
+╭━━【 FUN MENU 】━━
+┃ • .meme
+┃ • .joke
+┃ • .roast
+┃ • .simi
+┃ • .ship
+┃ • .tictactoe
+╰━━━━━━━━━━━━━━━
+
+╭━━【 TOOLS MENU 】━━
+┃ • .imgtourl
+┃ • .qrgen
+┃ • .shorturl
+┃ • .tts
+┃ • .weather
+┃ • .translate
+╰━━━━━━━━━━━━━━━
+
+╭━━【 CONVERT MENU 】━━
+┃ • .img2pdf
+┃ • .pdf2img
+┃ • .doc2pdf
+┃ • .img2text
+┃ • .video2mp3
+╰━━━━━━━━━━━━━━━
+
+╭━━【 OTHER MENU 】━━
+┃ • .runtime
+┃ • .ping
+┃ • .developer
+┃ • .buybot
+┃ • .repo
+╰━━━━━━━━━━━━━━━
+
+╭━━【 DEVELOPER 】━━
+┃ • .broadcast
+┃ • .statics
+┃ • .mode
+┃ • .listusers
+╰━━━━━━━━━━━━━━━
+
+▣ Powered by *CYBIX TECH* 👹💀`;
+
+  await ctx.replyWithPhoto(
+    { url: BANNER },
+    {
+      caption,
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard(CHANNEL_BUTTONS)
+    }
+  );
+}
+
+// Fallback for unknown commands
+bot.on('text', async ctx => {
+  if (!ctx.message.text.startsWith('.')) return;
+  await ctx.replyWithPhoto(
+    { url: BANNER },
+    {
+      caption: '❌ Unknown command. Type .menu to see all available commands.',
+      ...Markup.inlineKeyboard(CHANNEL_BUTTONS)
+    }
+  );
 });
 
-bot.on("message", async (msg) => {
-  if (!msg.text || !msg.text.startsWith(".")) return;
-  
-  const [cmd, ...args] = msg.text.slice(1).split(" ");
-  const argText = args.join(" ");
-  const plugin = plugins[cmd.toLowerCase()];
-  const bannerUrl = getBanner();
-  const buttons = getChannelButtons();
-  
-  if (allMenus["." + cmd.toLowerCase()]) return;
-  
-  if (plugin) {
-    if (plugin.premium && !isPremium(msg.from.id) && msg.from.id != config.ownerId) {
-      await bot.sendPhoto(msg.chat.id, bannerUrl, {
-        caption: "🔒 This command is for premium users. Type `.premium` to see how to upgrade.",
-        reply_markup: buttons,
-      });
-      return;
-    }
-    if (plugin.developer && msg.from.id != config.ownerId) {
-      await bot.sendPhoto(msg.chat.id, bannerUrl, {
-        caption: "🔒 This command is for the developer only.",
-        reply_markup: buttons,
-      });
-      return;
-    }
-    
-    try {
-      await bot.sendPhoto(msg.chat.id, bannerUrl, {
-        caption: buildMenuCaption(msg),
-        reply_markup: buttons,
-      });
-      await plugin.run(bot, msg, argText, { config, isPremium, addPremium, removePremium, listPremium, bot });
-    } catch (err) {
-      // Only log error, never send to user
-      console.error(err);
-    }
-  }
+// Error handling
+bot.catch((err, ctx) => {
+  console.error(`[CYBIX] Error for ${ctx.updateType}`, err);
 });
 
-module.exports = bot;
+bot.launch();
+console.log('CYBIX V1 started!');
+
+// Graceful stop
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));

@@ -1,10 +1,10 @@
 services:
   - type: web
-    name: cybix-v3-bot
+    name: cybix-v1
     env: node
     plan: free
-    buildCommand: "npm install"
-    startCommand: "npm start"
+    buildCommand: npm install
+    startCommand: node index.js
     envVars:
       - key: BOT_TOKEN
         sync: false
