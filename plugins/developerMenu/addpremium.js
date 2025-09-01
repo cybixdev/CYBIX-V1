@@ -1,5 +1,4 @@
 const { getChannelButtons } = require("../../utils/buttons");
-const { getBanner } = require("../../utils/banner");
 module.exports = {
   command: "addpremium",
   aliases: [],

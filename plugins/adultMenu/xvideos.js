@@ -1,6 +1,5 @@
 const axios = require("axios");
-const { getChannelButtons } = require("../../utils/buttons");
-const { getBanner } = require("../../utils/banner");
+const { getChannelButtons } = require("../../utils/buttons");l
 module.exports = {
   command: "xvideos",
   aliases: [],
