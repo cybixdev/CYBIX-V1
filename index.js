@@ -2,12 +2,11 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID || "0";
-const BANNER = 'https://i.postimg.cc/L4NwW5WY/boykaxd.jpg';
 const PORT = process.env.PORT || 3000;
+const BANNER = 'https://i.postimg.cc/L4NwW5WY/boykaxd.jpg';
 
 const CHANNEL_BUTTONS = [
   [Markup.button.url('Whatsapp Channel', 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X')],
@@ -23,25 +22,26 @@ const bot = new Telegraf(BOT_TOKEN);
 
 // --- Plugin Loader ---
 function loadPlugins(pluginDir) {
+  if (!fs.existsSync(pluginDir)) return;
   fs.readdirSync(pluginDir, { withFileTypes: true }).forEach(entry => {
     const fullPath = path.join(pluginDir, entry.name);
     if (entry.isDirectory()) {
       loadPlugins(fullPath);
     } else if (entry.isFile() && entry.name.endsWith('.js')) {
-      const plugin = require(fullPath);
-      if (typeof plugin === 'function') {
-        try {
+      try {
+        const plugin = require(fullPath);
+        if (typeof plugin === 'function') {
           plugin(bot, { OWNER_ID, BANNER, CHANNEL_BUTTONS });
-        } catch (e) {
-          console.error(`❌ Error loading plugin ${fullPath}:`, e.message);
         }
+      } catch (e) {
+        console.error(`❌ Error loading plugin ${fullPath}:`, e.message);
       }
     }
   });
 }
 loadPlugins(path.join(__dirname, 'plugins'));
 
-// --- Helpers ---
+// --- Menu Helper Functions ---
 function formatMemory(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
@@ -56,6 +56,7 @@ function formatUptime() {
 }
 function countPlugins(dir) {
   let count = 0;
+  if (!fs.existsSync(dir)) return 0;
   fs.readdirSync(dir, { withFileTypes: true }).forEach(entry => {
     if (entry.isDirectory()) count += countPlugins(path.join(dir, entry.name));
     else if (entry.isFile() && entry.name.endsWith('.js')) count++;
@@ -63,13 +64,15 @@ function countPlugins(dir) {
   return count;
 }
 
-// --- Main Menu Handler ---
+// ---- MAIN MENU HANDLER (NO STRUCTURE CHANGES) ----
 async function sendMenu(ctx) {
   try {
     const user = ctx.from;
     const mem = process.memoryUsage();
     const pluginCount = countPlugins(path.join(__dirname, 'plugins'));
-    const caption =
+
+    // -- YOUR MENU STRUCTURE, UNCHANGED --
+    const menuText =
 `╭━━━[ 𝐂𝐘𝐁𝐈𝐗 𝐕1 MAIN MENU ]━━━
 ┃ 👤 User: ${user.username ? '@' + user.username : user.first_name}
 ┃ 🆔 ID: ${user.id}
@@ -178,48 +181,50 @@ async function sendMenu(ctx) {
 
 ▣ Powered by *CYBIX TECH* 👹💀`;
 
+    // Telegram photo caption max 1024 chars
     await ctx.replyWithPhoto(
-      { url: BANNER },
+      BANNER,
       {
-        caption,
+        caption: menuText.slice(0, 1024),
         parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard(CHANNEL_BUTTONS)
+        reply_markup: { inline_keyboard: CHANNEL_BUTTONS }
       }
     );
+    if (menuText.length > 1024) {
+      await ctx.reply(menuText.slice(1024), { parse_mode: 'Markdown' });
+    }
   } catch (e) {
-    await ctx.reply('❌ Error displaying menu.');
+    await ctx.reply("❌ Error displaying menu: " + e.message);
   }
 }
 
-// --- Command Triggers ---
-// Responds to both /start, .start, /menu, .menu
+// --- Menu Command Triggers ---
 bot.command(['start', 'menu'], sendMenu);
-bot.hears(/^\.menu$/i, sendMenu);
 bot.hears(/^\.start$/i, sendMenu);
+bot.hears(/^\.menu$/i, sendMenu);
 
-// --- Fallback for Unknown Commands ---
+// --- Fallback for Unknown Dot Commands ---
 bot.on('text', async ctx => {
   if (!ctx.message.text.startsWith('.')) return;
   await ctx.replyWithPhoto(
-    { url: BANNER },
+    BANNER,
     {
-      caption: '❌ Unknown command. Type .menu or /menu to see all available commands.',
-      ...Markup.inlineKeyboard(CHANNEL_BUTTONS)
+      caption: '❌ Unknown command. Type .menu or /menu to see available commands.',
+      reply_markup: { inline_keyboard: CHANNEL_BUTTONS }
     }
   );
 });
 
 // --- Error Handling ---
 bot.catch((err, ctx) => {
-  console.error(`[CYBIX] Error for ${ctx.updateType}`, err);
+  console.error(`[CYBIX] Error for ${ctx && ctx.updateType ? ctx.updateType : "unknown context"}`, err);
 });
 
-// --- Start Bot (with PORT support for Render/Heroku/etc) ---
+// --- Start Bot (PORT support for Render/Heroku and polling fallback) ---
 (async () => {
   try {
     if (process.env.WEBHOOK_URL) {
-      // For platforms requiring webhook (like Render, Vercel)
-      bot.launch({
+      await bot.launch({
         webhook: {
           domain: process.env.WEBHOOK_URL,
           port: PORT
@@ -227,7 +232,6 @@ bot.catch((err, ctx) => {
       });
       console.log(`CYBIX V1 started with Webhook! PORT: ${PORT}`);
     } else {
-      // Standard polling (Termux, localhost, etc)
       await bot.launch();
       console.log('CYBIX V1 started with polling!');
     }
