@@ -72,7 +72,7 @@ async function sendMenu(ctx) {
     const pluginCount = countPlugins(path.join(__dirname, 'plugins'));
 
     const menuText =
-`╭━━━[ 𝐂𝐘𝐁𝐈𝐗 𝐕1 MENU ]━━━
+`╭━━━[ 𝐂𝐘𝐁𝐈𝐗 𝐕1 MAIN MENU ]━━━
 ┃ 👤 User: ${user.username ? '@' + user.username : user.first_name}
 ┃ 🆔 ID: ${user.id}
 ┃ 👑 Owner: @cybixdev
