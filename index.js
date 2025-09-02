@@ -5,10 +5,8 @@ const path = require('path');
 const express = require('express');
 const pkg = require('./package.json');
 
-// Main bot instance
 const bot = new Telegraf(config.botToken);
 
-// Banner + buttons
 const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
   [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
@@ -27,7 +25,7 @@ const sendBanner = async (ctx, message, extra = {}) => {
   );
 };
 
-// Plugin loader
+// Plugin loader (only loads plugins that REGISTER commands)
 function loadPlugins() {
   const pluginsDir = path.join(__dirname, 'plugins');
   if (!fs.existsSync(pluginsDir)) return;
@@ -37,23 +35,18 @@ function loadPlugins() {
       fs.readdirSync(full).forEach(sub => {
         if (sub.endsWith('.js')) require(path.join(full, sub))(bot, sendBanner, config);
       });
-    } else if (file.endsWith('.js')) {
+    } else if (file.endsWith('.js') && file !== 'menu.js') {
       require(full)(bot, sendBanner, config);
     }
   });
 }
 loadPlugins();
 
-// Menu on start/menu command
-bot.start(async ctx => {
-  await require('./plugins/menu')(bot, sendBanner, config, ctx, pkg.version);
-});
-bot.command('menu', async ctx => {
-  await require('./plugins/menu')(bot, sendBanner, config, ctx, pkg.version);
-});
-bot.hears(/^\.(menu|start)/, async ctx => {
-  await require('./plugins/menu')(bot, sendBanner, config, ctx, pkg.version);
-});
+// Show menu ONLY when ctx exists!
+const menu = require('./plugins/menu');
+bot.start(ctx => menu(bot, sendBanner, config, ctx, pkg.version));
+bot.command('menu', ctx => menu(bot, sendBanner, config, ctx, pkg.version));
+bot.hears(/^\.(menu|start)/, ctx => menu(bot, sendBanner, config, ctx, pkg.version));
 
 // Fallback
 bot.on('text', async ctx => {
@@ -63,7 +56,7 @@ bot.on('text', async ctx => {
   }
 });
 
-// Express keepalive for Render/Vercel
+// Express keepalive for Render
 if (process.env.PORT) {
   const app = express();
   app.get('/', (req, res) => res.send('CYBIX V1 Bot is running.'));
@@ -72,7 +65,6 @@ if (process.env.PORT) {
   });
 }
 
-// Safe launch
 bot.launch().then(() => {
   console.log('CYBIX V1 is running!');
 });
