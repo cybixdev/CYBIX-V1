@@ -6,37 +6,17 @@ const os = require('os');
 const fs = require('fs');
 const path = require('path');
 
+// Bot instance
 const bot = new Telegraf(config.botToken);
 
+// Banner sender
 const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
   [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
 ]);
 
-// Plugin loader (counts plugins for menu display)
-function loadPlugins(bot, sendBanner, config) {
-  const pluginsDir = path.join(__dirname, 'plugins');
-  let pluginCount = 0;
-  if (!fs.existsSync(pluginsDir)) return pluginCount;
-  fs.readdirSync(pluginsDir).forEach(file => {
-    const full = path.join(pluginsDir, file);
-    if (fs.statSync(full).isDirectory()) {
-      fs.readdirSync(full).forEach(sub => {
-        if (sub.endsWith('.js')) {
-          require(path.join(full, sub))(bot, sendBanner, config);
-          pluginCount++;
-        }
-      });
-    } else if (file.endsWith('.js')) {
-      require(full)(bot, sendBanner, config);
-      pluginCount++;
-    }
-  });
-  return pluginCount;
-}
-
 const sendBanner = async (ctx, message, extra = {}) => {
-  if (!ctx || !ctx.replyWithPhoto) return;
+  if (!ctx || typeof ctx.replyWithPhoto !== 'function') return;
   await ctx.replyWithPhoto(
     { url: config.bannerUrl },
     {
@@ -48,9 +28,26 @@ const sendBanner = async (ctx, message, extra = {}) => {
   );
 };
 
+// Plugin loader (counts plugins)
+function loadPlugins(bot, sendBanner, config, baseDir = path.join(__dirname, 'plugins')) {
+  let pluginCount = 0;
+  function walk(dir) {
+    fs.readdirSync(dir).forEach(file => {
+      const full = path.join(dir, file);
+      if (fs.statSync(full).isDirectory()) {
+        walk(full);
+      } else if (file.endsWith('.js')) {
+        require(full)(bot, sendBanner, config);
+        pluginCount++;
+      }
+    });
+  }
+  if (fs.existsSync(baseDir)) walk(baseDir);
+  return pluginCount;
+}
 const pluginCount = loadPlugins(bot, sendBanner, config);
 
-// --- Menu logic ---
+// Menu function
 function sendMenu(ctx) {
   const now = new Date();
   const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone });
@@ -175,11 +172,14 @@ function sendMenu(ctx) {
   sendBanner(ctx, menu);
 }
 
-// Respond to all menu triggers
+// Menu triggers
 bot.start(sendMenu);
 bot.command('menu', sendMenu);
 bot.command('start', sendMenu);
-bot.hears(/^(\.|\/)?(menu|start)$/i, sendMenu);
+bot.hears(/^\.(menu|start)$/i, sendMenu);
+bot.hears(/^\/(menu|start)$/i, sendMenu);
+bot.hears(/^menu$/i, sendMenu);
+bot.hears(/^start$/i, sendMenu);
 
 // Unknown command fallback
 bot.on('text', async ctx => {
