@@ -1,13 +1,19 @@
 const { Telegraf, Markup } = require('telegraf');
 const config = require('./config');
-const fs = require('fs');
-const path = require('path');
 const express = require('express');
 const pkg = require('./package.json');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
 
-// --- Plugin loader ---
-// Counts plugins for display (still works if you add plugins later)
+const bot = new Telegraf(config.botToken);
+
+const channelButtons = Markup.inlineKeyboard([
+  [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
+  [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
+]);
+
+// Plugin loader (counts plugins for menu display)
 function loadPlugins(bot, sendBanner, config) {
   const pluginsDir = path.join(__dirname, 'plugins');
   let pluginCount = 0;
@@ -29,15 +35,6 @@ function loadPlugins(bot, sendBanner, config) {
   return pluginCount;
 }
 
-// --- Bot instance ---
-const bot = new Telegraf(config.botToken);
-
-// --- Banner sender ---
-const channelButtons = Markup.inlineKeyboard([
-  [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
-  [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
-]);
-
 const sendBanner = async (ctx, message, extra = {}) => {
   if (!ctx || !ctx.replyWithPhoto) return;
   await ctx.replyWithPhoto(
@@ -51,10 +48,9 @@ const sendBanner = async (ctx, message, extra = {}) => {
   );
 };
 
-// --- Load plugins and get plugin count ---
 const pluginCount = loadPlugins(bot, sendBanner, config);
 
-// --- Menu logic (directly in index.js!) ---
+// --- Menu logic ---
 function sendMenu(ctx) {
   const now = new Date();
   const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone });
@@ -179,19 +175,11 @@ function sendMenu(ctx) {
   sendBanner(ctx, menu);
 }
 
-// --- Menu triggers ---
-const menuTriggers = [
-  /^\/?(menu|start)$/i,
-  /^\.(menu|start)$/i,
-  /^menu$/i,
-  /^start$/i
-];
-
-// Listen for menu commands
+// Respond to all menu triggers
 bot.start(sendMenu);
 bot.command('menu', sendMenu);
 bot.command('start', sendMenu);
-bot.hears(menuTriggers, sendMenu);
+bot.hears(/^(\.|\/)?(menu|start)$/i, sendMenu);
 
 // Unknown command fallback
 bot.on('text', async ctx => {
@@ -210,7 +198,7 @@ if (process.env.PORT) {
   });
 }
 
-// --- Start bot ---
+// Start bot
 bot.launch().then(() => {
   console.log('CYBIX-V1 is running!');
 });
