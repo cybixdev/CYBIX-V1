@@ -1,5 +1,6 @@
 const os = require('os');
 module.exports = async (bot, sendBanner, config, ctx, version) => {
+  // ALWAYS use ctx here, never called without
   const now = new Date();
   const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone });
   const harareDate = now.toLocaleDateString('en-US', { timeZone: config.timeZone });

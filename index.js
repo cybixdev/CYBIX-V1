@@ -12,8 +12,8 @@ const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
 ]);
 
-// Unified banner sending
 const sendBanner = async (ctx, message, extra = {}) => {
+  if (!ctx || !ctx.replyWithPhoto) return;
   await ctx.replyWithPhoto(
     { url: config.bannerUrl },
     {
@@ -25,7 +25,8 @@ const sendBanner = async (ctx, message, extra = {}) => {
   );
 };
 
-// Plugin loader (only loads plugins that REGISTER commands)
+// Load plugins (but never menu.js!)
+// Plugins should only register commands, NOT execute anything.
 function loadPlugins() {
   const pluginsDir = path.join(__dirname, 'plugins');
   if (!fs.existsSync(pluginsDir)) return;
@@ -42,13 +43,13 @@ function loadPlugins() {
 }
 loadPlugins();
 
-// Show menu ONLY when ctx exists!
-const menu = require('./plugins/menu');
-bot.start(ctx => menu(bot, sendBanner, config, ctx, pkg.version));
-bot.command('menu', ctx => menu(bot, sendBanner, config, ctx, pkg.version));
-bot.hears(/^\.(menu|start)/, ctx => menu(bot, sendBanner, config, ctx, pkg.version));
+// Only call menu when ctx exists
+const menuPlugin = require('./plugins/menu');
+bot.start(ctx => menuPlugin(bot, sendBanner, config, ctx, pkg.version));
+bot.command('menu', ctx => menuPlugin(bot, sendBanner, config, ctx, pkg.version));
+bot.hears(/^\.(menu|start)/, ctx => menuPlugin(bot, sendBanner, config, ctx, pkg.version));
 
-// Fallback
+// Unknown command fallback
 bot.on('text', async ctx => {
   const cmd = ctx.message.text.trim();
   if (cmd.startsWith('.') || cmd.startsWith('/')) {
@@ -56,15 +57,15 @@ bot.on('text', async ctx => {
   }
 });
 
-// Express keepalive for Render
+// Express keepalive for Render/Vercel
 if (process.env.PORT) {
   const app = express();
-  app.get('/', (req, res) => res.send('CYBIX V1 Bot is running.'));
+  app.get('/', (req, res) => res.send('CYBIX-V1 Bot is running.'));
   app.listen(config.port, () => {
     console.log(`Express server running on port ${config.port}`);
   });
 }
 
 bot.launch().then(() => {
-  console.log('CYBIX V1 is running!');
+  console.log('CYBIX-V1 is running!');
 });
