@@ -5,13 +5,16 @@ const path = require('path');
 const express = require('express');
 const pkg = require('./package.json');
 
+// Main bot instance
 const bot = new Telegraf(config.botToken);
 
+// Banner + buttons
 const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
   [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
 ]);
 
+// Unified banner sending
 const sendBanner = async (ctx, message, extra = {}) => {
   await ctx.replyWithPhoto(
     { url: config.bannerUrl },
@@ -24,19 +27,24 @@ const sendBanner = async (ctx, message, extra = {}) => {
   );
 };
 
+// Plugin loader
 function loadPlugins() {
   const pluginsDir = path.join(__dirname, 'plugins');
-  function walk(dir) {
-    fs.readdirSync(dir).forEach(file => {
-      const full = path.join(dir, file);
-      if (fs.statSync(full).isDirectory()) walk(full);
-      else if (file.endsWith('.js')) require(full)(bot, sendBanner, config);
-    });
-  }
-  walk(pluginsDir);
+  if (!fs.existsSync(pluginsDir)) return;
+  fs.readdirSync(pluginsDir).forEach(file => {
+    const full = path.join(pluginsDir, file);
+    if (fs.statSync(full).isDirectory()) {
+      fs.readdirSync(full).forEach(sub => {
+        if (sub.endsWith('.js')) require(path.join(full, sub))(bot, sendBanner, config);
+      });
+    } else if (file.endsWith('.js')) {
+      require(full)(bot, sendBanner, config);
+    }
+  });
 }
 loadPlugins();
 
+// Menu on start/menu command
 bot.start(async ctx => {
   await require('./plugins/menu')(bot, sendBanner, config, ctx, pkg.version);
 });
@@ -47,6 +55,7 @@ bot.hears(/^\.(menu|start)/, async ctx => {
   await require('./plugins/menu')(bot, sendBanner, config, ctx, pkg.version);
 });
 
+// Fallback
 bot.on('text', async ctx => {
   const cmd = ctx.message.text.trim();
   if (cmd.startsWith('.') || cmd.startsWith('/')) {
@@ -54,6 +63,7 @@ bot.on('text', async ctx => {
   }
 });
 
+// Express keepalive for Render/Vercel
 if (process.env.PORT) {
   const app = express();
   app.get('/', (req, res) => res.send('CYBIX V1 Bot is running.'));
@@ -62,6 +72,7 @@ if (process.env.PORT) {
   });
 }
 
+// Safe launch
 bot.launch().then(() => {
   console.log('CYBIX V1 is running!');
 });

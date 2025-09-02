@@ -4,7 +4,7 @@ module.exports = {
   botToken: process.env.BOT_TOKEN,
   ownerId: process.env.OWNER_ID,
   port: process.env.PORT || 3000,
-  bannerUrl: 'https://files.catbox.moe/wf749g.jpg',
+  bannerUrl: 'https://i.postimg.cc/L4NwW5WY/boykaxd.jpg',
   whatsappChannel: 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X',
   telegramChannel: 'https://t.me/cybixtech',
   developerContact: 'https://t.me/cybixdev',
