@@ -1,182 +1,166 @@
-require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
-const path = require('path');
 const os = require('os');
+require('dotenv').config();
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const OWNER_ID = process.env.OWNER_ID || "0";
-const DEVELOPER = process.env.DEVELOPER || "@cybixdev";
-const PORT = process.env.PORT || 3000;
-const BANNER = 'https://i.imgur.com/X34jPIr.jpeg';
+const BOT_OWNER = process.env.BOT_OWNER || '@cybixdev';
+const BOT_VERSION = '2.1.0';
 
-const CHANNEL_BUTTONS = [
-  [Markup.button.url('Whatsapp Channel', 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X')],
-  [Markup.button.url('Telegram Channel', 'https://t.me/cybixtech')],
-  [Markup.button.url('Github Repo', 'https://github.com/hacknetmo')]
-];
+const bot = new Telegraf(process.env.BOT_TOKEN, { handlerTimeout: 15000 });
 
-if (!BOT_TOKEN || !OWNER_ID || OWNER_ID === "0") {
-  console.error('❌ BOT_TOKEN or OWNER_ID missing in .env');
-  process.exit(1);
-}
+const prefixRegex = /^([./])(menu|start)$/i;
 
-const bot = new Telegraf(BOT_TOKEN);
-
-// --- Helper Functions ---
-function formatMemoryShort(bytes) {
-  let mb = (bytes / 1024 / 1024).toFixed(1);
-  return (mb.length <= 10 ? mb : mb.slice(0, 10)) + ' MB';
-}
-function formatUptimeShort() {
-  let sec = process.uptime() | 0;
-  let h = Math.floor(sec / 3600);
-  let m = Math.floor((sec % 3600) / 60);
-  let s = sec % 60;
-  let out = `${h}h${m}m${s}s`;
-  return out.length <= 10 ? out : out.slice(0, 10);
-}
-function getCPUPercent() {
-  const loads = os.loadavg();
-  const cpuCount = os.cpus().length;
-  let percent = ((loads[0] / cpuCount) * 100).toFixed(1);
-  return (percent.length <= 10 ? percent : percent.slice(0, 10)) + '%';
-}
-function getHostShort() {
-  const host = os.hostname();
-  return host.length <= 10 ? host : host.slice(0, 10);
-}
-function getPlatformShort() {
-  const platform = os.platform();
-  return platform.length <= 10 ? platform : platform.slice(0, 10);
-}
-function countPlugins(dir) {
-  let count = 0;
-  if (!fs.existsSync(dir)) return 0;
-  fs.readdirSync(dir, { withFileTypes: true }).forEach(entry => {
-    if (entry.isDirectory()) count += countPlugins(path.join(dir, entry.name));
-    else if (entry.isFile() && entry.name.endsWith('.js')) count++;
+// Utility functions
+const formatUptime = () => {
+  const seconds = process.uptime();
+  const d = Math.floor(seconds / (3600 * 24));
+  const h = Math.floor(seconds % (3600 * 24) / 3600);
+  const m = Math.floor(seconds % 3600 / 60);
+  const s = Math.floor(seconds % 60);
+  return `${d}d ${h}h ${m}m ${s}s`;
+};
+const formatMemory = (rss) => `${(rss / 1024 / 1024).toFixed(2)} MB`;
+const pluginCount = () => {
+  let total = 0;
+  ['plugin/aiMenu', 'plugin/adultMenu', 'plugin/hentaiMenu', 'plugin/devMenu'].forEach(dir => {
+    total += fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith('.js')).length : 0;
   });
-  return count;
-}
-function getMenuSection(menuName, pluginDir) {
-  const files = fs.existsSync(pluginDir) ? fs.readdirSync(pluginDir).filter(f => f.endsWith('.js')) : [];
-  const commands = files.map(f => {
-    try {
-      const plugin = require(path.join(pluginDir, f));
-      return plugin && plugin.example ? plugin.example : `.${f.replace('.js','')}`;
-    } catch {
-      return `.${f.replace('.js','')}`;
-    }
-  });
-  return { menuName, commands };
-}
+  return total;
+};
+const serverInfo = () => `${os.platform()} ${os.arch()} (${os.hostname()}) PID:${process.pid}`;
 
-// --- Menu Sections ---
-const MENU_SECTIONS = [
-  getMenuSection('AI MENU', path.join(__dirname, 'plugins/aiMenu')),
-  getMenuSection('DOWNLOAD MENU', path.join(__dirname, 'plugins/downloadMenu')),
-  getMenuSection('NSFW MENU', path.join(__dirname, 'plugins/nsfwMenu')),
-  getMenuSection('PORN MENU', path.join(__dirname, 'plugins/pornMenu')),
-  getMenuSection('HENTAI MENU', path.join(__dirname, 'plugins/hentaiMenu')),
-  getMenuSection('FUN MENU', path.join(__dirname, 'plugins/funMenu')),
-  getMenuSection('TOOLS MENU', path.join(__dirname, 'plugins/toolsMenu')),
-  getMenuSection('CONVERT MENU', path.join(__dirname, 'plugins/convertMenu')),
-  getMenuSection('OTHER MENU', path.join(__dirname, 'plugins/otherMenu')),
-  getMenuSection('ADMIN MENU', path.join(__dirname, 'plugins/adminMenu')),
-  getMenuSection('DEVELOPER MENU', path.join(__dirname, 'plugins/devMenu'))
-];
+// Load all command files
+const loadCommands = (dir) => {
+  return fs.existsSync(dir) ?
+    fs.readdirSync(dir)
+    .filter(f => f.endsWith('.js'))
+    .map(f => require('./' + dir + '/' + f)) :
+    [];
+};
+const aiCommands = loadCommands('plugin/aiMenu');
+const adultCommands = loadCommands('plugin/adultMenu');
+const hentaiCommands = loadCommands('plugin/hentaiMenu');
+const devCommands = loadCommands('plugin/devMenu');
 
-// ---- MAIN MENU HANDLER ----
-async function sendMenu(ctx) {
-  try {
-    const user = ctx.from;
-    const mem = process.memoryUsage();
-    const pluginCount = countPlugins(path.join(__dirname, 'plugins'));
-    const cpuPercent = getCPUPercent();
-    const platform = getPlatformShort();
-    const host = getHostShort();
-    const uptime = formatUptimeShort();
-    const memory = formatMemoryShort(mem.rss);
-
-    let menuText =
-`╭━━━[ CYBIX V1 MENU ]━━━
-┃ 👤 User: ${user.username ? '@' + user.username : user.first_name}
-┃ 🆔 ID: ${user.id}
-┃ 👑 Owner: @cybixdev
-┃ 🧑‍💻 Dev: ${DEVELOPER}
-┃ 🕒 Up: ${uptime}
-┃ 💾 Mem: ${memory}
-┃ ⚙️ Plugins: ${pluginCount}
-┃ 🖥️ Plat: ${platform}
-┃ 🧠 CPU: ${cpuPercent}
-┃ 🏠 Host: ${host}
-┃ ⏳ Prefix: . or /
-┃ 📅 Date: ${new Date().toLocaleString()}
-╰━━━━━━━━━━━━━━━
+// Banner (ASCII Art)
+const BANNER = `
+╔════════════════════════════════════╗
+║      CYBIX V2 TELEGRAM BOT        ║
+║     The most dope AI/NSFW bot!    ║
+╚════════════════════════════════════╝
 `;
 
-    for (const section of MENU_SECTIONS) {
-      if (section.commands.length) {
-        menuText += `\n╭━━【 ${section.menuName} 】━━\n`;
-        menuText += section.commands.map(cmd => `┃ • ${cmd}`).join('\n');
-        menuText += `\n╰━━━━━━━━━━━━━━━\n`;
-      }
-    }
+// Menu caption generator
+function getMenuCaption(user, mem) {
+  return `${BANNER}
+╭━━━[ MAIN MENU ]━━━
+┃ 👤 User: ${user.username ? '@' + user.username : user.first_name}
+┃ 🆔 ID: ${user.id}
+┃ 👑 Owner: ${BOT_OWNER}
+┃ 💾 Memory: ${formatMemory(mem.rss)}
+┃ 🕒 Uptime: ${formatUptime()}
+┃ ⚙️ Plugins: ${pluginCount()}
+┃ 🔖 Bot Version: ${BOT_VERSION}
+┃ 🖥️ Server: ${serverInfo()}
+┃ ⏳ Prefix: . or /
+┃ 🛠️ Use buttons below or type .menu /menu /start
+╰━━━━━━━━━━━━━━━━━━━━━━━
 
-    menuText += `
-▣ Powered by *CYBIX TECH* 👹💀`;
+╭━[ AI MENU (${aiCommands.length}) ]━╮
+${aiCommands.map(cmd => `┃ • ${cmd.example} — ${cmd.desc}`).join('\n')}
+╰━━━━━━━━━━━━━━━━━━━━━━━
 
-    await ctx.replyWithPhoto(
-      { url: BANNER },
-      {
-        caption: menuText,
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: CHANNEL_BUTTONS }
-      }
-    );
-  } catch (e) {
-    await ctx.reply("❌ Error displaying menu: " + e.message);
-  }
+╭━[ ADULT MENU (${adultCommands.length}) ]━╮
+${adultCommands.map(cmd => `┃ • ${cmd.example} — ${cmd.desc}`).join('\n')}
+╰━━━━━━━━━━━━━━━━━━━━━━━
+
+╭━[ HENTAI MENU (${hentaiCommands.length}) ]━╮
+${hentaiCommands.map(cmd => `┃ • ${cmd.example} — ${cmd.desc}`).join('\n')}
+╰━━━━━━━━━━━━━━━━━━━━━━━
+
+╭━[ DEV MENU (${devCommands.length}) OWNER ONLY ]━╮
+${devCommands.map(cmd => `┃ • ${cmd.example} — ${cmd.desc}`).join('\n')}
+╰━━━━━━━━━━━━━━━━━━━━━━━
+
+╭━━[ EXTRA ]━━
+┃ Prefix: . or /
+┃ Use menu buttons or type .menu /menu /start.
+┃ All commands work with both prefixes!
+┃ Contact owner for bugs.
+╰━━━━━━━━━━━━━━━━━━━━━━━`;
 }
 
-// --- Menu Command Triggers ---
-bot.command(['start', 'menu'], sendMenu);
-bot.hears(/^\.start$/i, sendMenu);
-bot.hears(/^\.menu$/i, sendMenu);
+// Buttons for menu navigation
+const menuButtons = Markup.inlineKeyboard([
+  [Markup.button.callback('AI MENU', 'ai_menu'), Markup.button.callback('ADULT MENU', 'adult_menu')],
+  [Markup.button.callback('HENTAI MENU', 'hentai_menu'), Markup.button.callback('DEV MENU', 'dev_menu')],
+  [Markup.button.callback('MAIN MENU', 'main_menu')]
+]);
 
-// --- Fallback for Unknown Dot Commands ---
-bot.on('text', async ctx => {
-  if (!ctx.message.text.startsWith('.')) return;
-  await sendMenu(ctx);
+// Send main menu
+async function sendMenu(ctx) {
+  const mem = process.memoryUsage();
+  await ctx.reply(getMenuCaption(ctx.from, mem), menuButtons);
+}
+
+// Button handlers for menu navigation
+bot.action('main_menu', async ctx => {
+  await ctx.editMessageText(getMenuCaption(ctx.from, process.memoryUsage()), menuButtons);
+});
+bot.action('ai_menu', async ctx => {
+  await ctx.editMessageText(
+    `${BANNER}\n╭━[ AI MENU (${aiCommands.length}) ]━╮\n${aiCommands.map(cmd => `┃ • ${cmd.example} — ${cmd.desc}`).join('\n')}\n╰━━━━━━━━━━━━━━━━━━━━━━━`,
+    menuButtons
+  );
+});
+bot.action('adult_menu', async ctx => {
+  await ctx.editMessageText(
+    `${BANNER}\n╭━[ ADULT MENU (${adultCommands.length}) ]━╮\n${adultCommands.map(cmd => `┃ • ${cmd.example} — ${cmd.desc}`).join('\n')}\n╰━━━━━━━━━━━━━━━━━━━━━━━`,
+    menuButtons
+  );
+});
+bot.action('hentai_menu', async ctx => {
+  await ctx.editMessageText(
+    `${BANNER}\n╭━[ HENTAI MENU (${hentaiCommands.length}) ]━╮\n${hentaiCommands.map(cmd => `┃ • ${cmd.example} — ${cmd.desc}`).join('\n')}\n╰━━━━━━━━━━━━━━━━━━━━━━━`,
+    menuButtons
+  );
+});
+bot.action('dev_menu', async ctx => {
+  await ctx.editMessageText(
+    `${BANNER}\n╭━[ DEV MENU (${devCommands.length}) OWNER ONLY ]━╮\n${devCommands.map(cmd => `┃ • ${cmd.example} — ${cmd.desc}`).join('\n')}\n╰━━━━━━━━━━━━━━━━━━━━━━━`,
+    menuButtons
+  );
 });
 
-// --- Error Handling ---
-bot.catch((err, ctx) => {
-  console.error(`[CYBIX] Error for ${ctx && ctx.updateType ? ctx.updateType : "unknown context"}`, err);
-});
+// Menu triggers
+bot.hears(prefixRegex, async ctx => await sendMenu(ctx));
 
-// --- Start Bot (PORT support for Render/Heroku and polling fallback) ---
-(async () => {
-  try {
-    if (process.env.WEBHOOK_URL) {
-      await bot.launch({
-        webhook: {
-          domain: process.env.WEBHOOK_URL,
-          port: PORT
-        }
-      });
-      console.log(`CYBIX V1 started with Webhook! PORT: ${PORT}`);
-    } else {
-      await bot.launch();
-      console.log('CYBIX V1 started with polling!');
+// Individual commands
+[...aiCommands, ...adultCommands, ...hentaiCommands, ...devCommands].forEach(cmd => {
+  bot.hears(new RegExp(`^([./])${cmd.name}(\\s+.*)?$`, 'i'), async ctx => {
+    try {
+      await cmd.run(ctx);
+    } catch (e) {
+      await ctx.reply(`❌ Error: ${e.message}`);
     }
-  } catch (e) {
-    console.error('❌ Failed to launch bot:', e.message);
-    process.exit(1);
-  }
-})();
+  });
+});
 
-// --- Graceful Shutdown ---
+// Unknown command fallback
+bot.on('text', async ctx => {
+  if (/^([./])/.test(ctx.message.text)) {
+    await ctx.reply('❓ Unknown command! Type .menu or /menu for help.');
+  }
+});
+
+// Error handling
+bot.catch((err, ctx) => {
+  console.error('Bot error:', err);
+  ctx.reply('⚠️ An error occurred!');
+});
+
+bot.launch();
+console.log('CYBIX V2 BOT ONLINE!');
+
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
