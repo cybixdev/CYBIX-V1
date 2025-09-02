@@ -4,8 +4,10 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const pkg = require('./package.json');
+const os = require('os');
 
-// Plugin loader - returns plugin count for menu
+// --- Plugin loader ---
+// Counts plugins for display (still works if you add plugins later)
 function loadPlugins(bot, sendBanner, config) {
   const pluginsDir = path.join(__dirname, 'plugins');
   let pluginCount = 0;
@@ -19,7 +21,7 @@ function loadPlugins(bot, sendBanner, config) {
           pluginCount++;
         }
       });
-    } else if (file.endsWith('.js') && file !== 'menu.js') {
+    } else if (file.endsWith('.js')) {
       require(full)(bot, sendBanner, config);
       pluginCount++;
     }
@@ -27,8 +29,10 @@ function loadPlugins(bot, sendBanner, config) {
   return pluginCount;
 }
 
+// --- Bot instance ---
 const bot = new Telegraf(config.botToken);
 
+// --- Banner sender ---
 const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
   [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
@@ -47,25 +51,149 @@ const sendBanner = async (ctx, message, extra = {}) => {
   );
 };
 
-const loadedPlugins = loadPlugins(bot, sendBanner, config);
+// --- Load plugins and get plugin count ---
+const pluginCount = loadPlugins(bot, sendBanner, config);
 
-// Always respond to /menu, .menu, /start, .start, menu, start
-const menuPlugin = require('./plugins/menu');
-const menuHandler = ctx => menuPlugin({
-  bot,
-  sendBanner,
-  config,
-  ctx,
-  version: pkg.version,
-  pluginCount: loadedPlugins
-});
+// --- Menu logic (directly in index.js!) ---
+function sendMenu(ctx) {
+  const now = new Date();
+  const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone });
+  const harareDate = now.toLocaleDateString('en-US', { timeZone: config.timeZone });
+  const uptime = `${process.uptime().toFixed(0)}s`;
+  const ram = `${(os.totalmem() / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  const userId = ctx?.from?.id || 'Unknown';
+  const userName = ctx?.from?.first_name || 'User';
+  const version = pkg.version;
 
-bot.start(menuHandler);
-bot.command('menu', menuHandler);
-bot.command('start', menuHandler);
-bot.hears(/^(\.|\/)?(menu|start)$/i, menuHandler);
+  const menu = `
+╭━━〔 CYBIX-V1 MENU 〕━━╮
+│ ✦ Prefix : [ . ] or [ / ]
+│ ✦ Owner : ${config.ownerId}
+│ ✦ User : ${userName} (${userId})
+│ ✦ Plugins Loaded : ${pluginCount}
+│ ✦ Version : ${version}
+│ ✦ Uptime : ${uptime}
+│ ✦ Time Now : ${harareTime}
+│ ✦ Date Today : ${harareDate}
+│ ✦ Time Zone : Africa/Harare
+│ ✦ Server RAM : ${ram}
+╰───────────────────╯
 
-// Fallback for unknown commands
+╭━✦❮ AI MENU ❯✦━⊷
+┃ chatgpt
+┃ gemini
+┃ llama
+┃ imggen
+┃ blackbox
+╰━━━━━━━━━━━━━━━━━⊷
+
+╭━✦❮ DL MENU ❯✦━⊷
+┃ apk
+┃ song
+┃ image
+┃ play
+┃ yts
+┃ ytmp4
+┃ gitclone
+╰━━━━━━━━━━━━━━━━━⊷
+
+╭━✦❮ NSFW MENU ❯✦━⊷
+┃ nsfw
+┃ lewd
+┃ xvideos
+┃ xhamster
+┃ rule34
+┃ boobs
+┃ ass
+┃ hentaiimg
+┃ nsfwgif
+┃ ecchi
+┃ yandere
+┃ oppai
+┃ feet
+┃ cum
+┃ peeing
+╰━━━━━━━━━━━━━━━━━⊷
+
+╭━✦❮ HENTAI MENU ❯✦━⊷
+┃ hebati
+┃ hentai
+┃ doujin
+┃ nekopoi
+┃ waifu18
+╰━━━━━━━━━━━━━━━━━⊷
+
+╭━✦❮ PORN MENU ❯✦━⊷
+┃ porn
+┃ sextube
+┃ pornhub
+┃ milf
+┃ ebony
+┃ lesbian
+┃ gangbang
+┃ gloryhole
+┃ dp
+┃ anal
+┃ blowjob
+┃ facial
+┃ cumshot
+┃ creampie
+╰━━━━━━━━━━━━━━━━━⊷
+
+╭━✦❮ ADULT MENU ❯✦━⊷
+┃ adult
+┃ bdsm
+┃ femdom
+┃ japan18
+╰━━━━━━━━━━━━━━━━━⊷
+
+╭━✦❮ DEVELOPER ❯✦━⊷
+┃ devinfo
+┃ broadcast
+┃ killall
+┃ stats
+┃ restart
+┃ update
+╰━━━━━━━━━━━━━━━━━⊷
+
+╭━✦❮ USEFUL MENU ❯✦━⊷
+┃ shorten
+┃ weather
+┃ news
+┃ currency
+┃ crypto
+┃ translate
+┃ qr
+┃ uuid
+╰━━━━━━━━━━━━━━━━━⊷
+
+╭━✦❮ FUN MENU ❯✦━⊷
+┃ waifu
+┃ meme
+┃ joke
+┃ anime
+┃ roast
+┃ diss
+╰━━━━━━━━━━━━━━━━━⊷
+`;
+  sendBanner(ctx, menu);
+}
+
+// --- Menu triggers ---
+const menuTriggers = [
+  /^\/?(menu|start)$/i,
+  /^\.(menu|start)$/i,
+  /^menu$/i,
+  /^start$/i
+];
+
+// Listen for menu commands
+bot.start(sendMenu);
+bot.command('menu', sendMenu);
+bot.command('start', sendMenu);
+bot.hears(menuTriggers, sendMenu);
+
+// Unknown command fallback
 bot.on('text', async ctx => {
   const cmd = ctx.message.text.trim();
   if (/^(\.|\/)?[a-zA-Z]+/.test(cmd)) {
@@ -82,6 +210,7 @@ if (process.env.PORT) {
   });
 }
 
+// --- Start bot ---
 bot.launch().then(() => {
   console.log('CYBIX-V1 is running!');
 });
