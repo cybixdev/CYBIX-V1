@@ -8,12 +8,12 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID || "0";
 const DEVELOPER = process.env.DEVELOPER || "@cybixdev";
 const PORT = process.env.PORT || 3000;
-const BANNER = 'https://files.catbox.moe/bzhmpr.jpg';
+const BANNER = 'https://i.imgur.com/X34jPIr.jpeg';
 
 const CHANNEL_BUTTONS = [
   [Markup.button.url('Whatsapp Channel', 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X')],
   [Markup.button.url('Telegram Channel', 'https://t.me/cybixtech')],
-  [Markup.button.url('Github Repo', 'https://github.com/JadenAfrix1')]
+  [Markup.button.url('Github Repo', 'https://github.com/hacknetmo')]
 ];
 
 if (!BOT_TOKEN || !OWNER_ID || OWNER_ID === "0") {
@@ -24,36 +24,31 @@ if (!BOT_TOKEN || !OWNER_ID || OWNER_ID === "0") {
 const bot = new Telegraf(BOT_TOKEN);
 
 // --- Helper Functions ---
-function formatMemory(bytes) {
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+function formatMemoryShort(bytes) {
+  let mb = (bytes / 1024 / 1024).toFixed(1);
+  return (mb.length <= 10 ? mb : mb.slice(0, 10)) + ' MB';
 }
-function formatUptime() {
+function formatUptimeShort() {
   let sec = process.uptime() | 0;
-  let [h, m, s] = [
-    Math.floor(sec / 3600),
-    Math.floor((sec % 3600) / 60),
-    sec % 60
-  ];
-  return `${h}h ${m}m ${s}s`;
+  let h = Math.floor(sec / 3600);
+  let m = Math.floor((sec % 3600) / 60);
+  let s = sec % 60;
+  let out = `${h}h${m}m${s}s`;
+  return out.length <= 10 ? out : out.slice(0, 10);
 }
-function getCPU() {
-  const cpus = os.cpus();
-  return cpus && cpus.length ? `${cpus[0].model} (${cpus.length} cores)` : "Unknown";
+function getCPUPercent() {
+  const loads = os.loadavg();
+  const cpuCount = os.cpus().length;
+  let percent = ((loads[0] / cpuCount) * 100).toFixed(1);
+  return (percent.length <= 10 ? percent : percent.slice(0, 10)) + '%';
 }
-function getPlatform() {
-  return `${os.platform()} ${os.arch()} (${os.hostname()})`;
+function getHostShort() {
+  const host = os.hostname();
+  return host.length <= 10 ? host : host.slice(0, 10);
 }
-function getHost() {
-  return os.hostname();
-}
-function getLoad() {
-  return os.loadavg().map(l => l.toFixed(2)).join(' / ');
-}
-function getFreeMem() {
-  return `${(os.freemem()/1024/1024).toFixed(2)} MB`;
-}
-function getTotalMem() {
-  return `${(os.totalmem()/1024/1024).toFixed(2)} MB`;
+function getPlatformShort() {
+  const platform = os.platform();
+  return platform.length <= 10 ? platform : platform.slice(0, 10);
 }
 function countPlugins(dir) {
   let count = 0;
@@ -64,8 +59,6 @@ function countPlugins(dir) {
   });
   return count;
 }
-
-// --- Dynamic Menu Loader ---
 function getMenuSection(menuName, pluginDir) {
   const files = fs.existsSync(pluginDir) ? fs.readdirSync(pluginDir).filter(f => f.endsWith('.js')) : [];
   const commands = files.map(f => {
@@ -82,7 +75,16 @@ function getMenuSection(menuName, pluginDir) {
 // --- Menu Sections ---
 const MENU_SECTIONS = [
   getMenuSection('AI MENU', path.join(__dirname, 'plugins/aiMenu')),
-  // Add other menus here as needed (download, tools, etc)
+  getMenuSection('DOWNLOAD MENU', path.join(__dirname, 'plugins/downloadMenu')),
+  getMenuSection('NSFW MENU', path.join(__dirname, 'plugins/nsfwMenu')),
+  getMenuSection('PORN MENU', path.join(__dirname, 'plugins/pornMenu')),
+  getMenuSection('HENTAI MENU', path.join(__dirname, 'plugins/hentaiMenu')),
+  getMenuSection('FUN MENU', path.join(__dirname, 'plugins/funMenu')),
+  getMenuSection('TOOLS MENU', path.join(__dirname, 'plugins/toolsMenu')),
+  getMenuSection('CONVERT MENU', path.join(__dirname, 'plugins/convertMenu')),
+  getMenuSection('OTHER MENU', path.join(__dirname, 'plugins/otherMenu')),
+  getMenuSection('ADMIN MENU', path.join(__dirname, 'plugins/adminMenu')),
+  getMenuSection('DEVELOPER MENU', path.join(__dirname, 'plugins/devMenu'))
 ];
 
 // ---- MAIN MENU HANDLER ----
@@ -91,27 +93,24 @@ async function sendMenu(ctx) {
     const user = ctx.from;
     const mem = process.memoryUsage();
     const pluginCount = countPlugins(path.join(__dirname, 'plugins'));
-    const cpu = getCPU();
-    const platform = getPlatform();
-    const host = getHost();
-    const load = getLoad();
-    const freeMem = getFreeMem();
-    const totalMem = getTotalMem();
+    const cpuPercent = getCPUPercent();
+    const platform = getPlatformShort();
+    const host = getHostShort();
+    const uptime = formatUptimeShort();
+    const memory = formatMemoryShort(mem.rss);
 
     let menuText =
-`╭━━━[ 𝐂𝐘𝐁𝐈𝐗 𝐕1 MENU ]━━━
+`╭━━━[ CYBIX V1 MENU ]━━━
 ┃ 👤 User: ${user.username ? '@' + user.username : user.first_name}
 ┃ 🆔 ID: ${user.id}
 ┃ 👑 Owner: @cybixdev
-┃ 🧑‍💻 Developer: ${DEVELOPER}
-┃ 🕒 Uptime: ${formatUptime()}
-┃ 💾 Memory: ${formatMemory(mem.rss)} / ${totalMem} (free: ${freeMem})
-┃ ⚙️ Plugins Loaded: ${pluginCount}
-┃ 🖥️ Platform: ${platform}
-┃ 🧠 CPU: ${cpu}
+┃ 🧑‍💻 Dev: ${DEVELOPER}
+┃ 🕒 Up: ${uptime}
+┃ 💾 Mem: ${memory}
+┃ ⚙️ Plugins: ${pluginCount}
+┃ 🖥️ Plat: ${platform}
+┃ 🧠 CPU: ${cpuPercent}
 ┃ 🏠 Host: ${host}
-┃ 📊 Load: ${load}
-┃ 🔥 Runtime: Node.js ${process.version}
 ┃ ⏳ Prefix: . or /
 ┃ 📅 Date: ${new Date().toLocaleString()}
 ╰━━━━━━━━━━━━━━━
@@ -129,14 +128,13 @@ async function sendMenu(ctx) {
 ▣ Powered by *CYBIX TECH* 👹💀`;
 
     await ctx.replyWithPhoto(
-      BANNER,
+      { url: BANNER },
       {
+        caption: menuText,
+        parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: CHANNEL_BUTTONS }
       }
     );
-
-    await ctx.reply(menuText, { parse_mode: 'Markdown' });
-
   } catch (e) {
     await ctx.reply("❌ Error displaying menu: " + e.message);
   }
@@ -150,13 +148,7 @@ bot.hears(/^\.menu$/i, sendMenu);
 // --- Fallback for Unknown Dot Commands ---
 bot.on('text', async ctx => {
   if (!ctx.message.text.startsWith('.')) return;
-  await ctx.replyWithPhoto(
-    BANNER,
-    {
-      caption: '❌ Unknown command. Type .menu or /menu to see available commands.',
-      reply_markup: { inline_keyboard: CHANNEL_BUTTONS }
-    }
-  );
+  await sendMenu(ctx);
 });
 
 // --- Error Handling ---
