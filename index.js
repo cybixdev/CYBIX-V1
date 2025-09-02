@@ -5,6 +5,28 @@ const path = require('path');
 const express = require('express');
 const pkg = require('./package.json');
 
+// Plugin loader - returns plugin count for menu
+function loadPlugins(bot, sendBanner, config) {
+  const pluginsDir = path.join(__dirname, 'plugins');
+  let pluginCount = 0;
+  if (!fs.existsSync(pluginsDir)) return pluginCount;
+  fs.readdirSync(pluginsDir).forEach(file => {
+    const full = path.join(pluginsDir, file);
+    if (fs.statSync(full).isDirectory()) {
+      fs.readdirSync(full).forEach(sub => {
+        if (sub.endsWith('.js')) {
+          require(path.join(full, sub))(bot, sendBanner, config);
+          pluginCount++;
+        }
+      });
+    } else if (file.endsWith('.js') && file !== 'menu.js') {
+      require(full)(bot, sendBanner, config);
+      pluginCount++;
+    }
+  });
+  return pluginCount;
+}
+
 const bot = new Telegraf(config.botToken);
 
 const channelButtons = Markup.inlineKeyboard([
@@ -25,35 +47,29 @@ const sendBanner = async (ctx, message, extra = {}) => {
   );
 };
 
-// Load plugins (but never menu.js!)
-// Plugins should only register commands, NOT execute anything.
-function loadPlugins() {
-  const pluginsDir = path.join(__dirname, 'plugins');
-  if (!fs.existsSync(pluginsDir)) return;
-  fs.readdirSync(pluginsDir).forEach(file => {
-    const full = path.join(pluginsDir, file);
-    if (fs.statSync(full).isDirectory()) {
-      fs.readdirSync(full).forEach(sub => {
-        if (sub.endsWith('.js')) require(path.join(full, sub))(bot, sendBanner, config);
-      });
-    } else if (file.endsWith('.js') && file !== 'menu.js') {
-      require(full)(bot, sendBanner, config);
-    }
-  });
-}
-loadPlugins();
+const loadedPlugins = loadPlugins(bot, sendBanner, config);
 
-// Only call menu when ctx exists
+// Always respond to /menu, .menu, /start, .start, menu, start
 const menuPlugin = require('./plugins/menu');
-bot.start(ctx => menuPlugin(bot, sendBanner, config, ctx, pkg.version));
-bot.command('menu', ctx => menuPlugin(bot, sendBanner, config, ctx, pkg.version));
-bot.hears(/^\.(menu|start)/, ctx => menuPlugin(bot, sendBanner, config, ctx, pkg.version));
+const menuHandler = ctx => menuPlugin({
+  bot,
+  sendBanner,
+  config,
+  ctx,
+  version: pkg.version,
+  pluginCount: loadedPlugins
+});
 
-// Unknown command fallback
+bot.start(menuHandler);
+bot.command('menu', menuHandler);
+bot.command('start', menuHandler);
+bot.hears(/^(\.|\/)?(menu|start)$/i, menuHandler);
+
+// Fallback for unknown commands
 bot.on('text', async ctx => {
   const cmd = ctx.message.text.trim();
-  if (cmd.startsWith('.') || cmd.startsWith('/')) {
-    await sendBanner(ctx, `❓ Unknown command. Type .menu or /menu to see all features.`);
+  if (/^(\.|\/)?[a-zA-Z]+/.test(cmd)) {
+    await sendBanner(ctx, `❓ Unknown command. Type .menu or /menu or .start or /start to see all features.`);
   }
 });
 

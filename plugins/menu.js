@@ -1,17 +1,18 @@
 const os = require('os');
-module.exports = async (bot, sendBanner, config, ctx, version) => {
-  // ALWAYS use ctx here, never called without
+module.exports = ({ bot, sendBanner, config, ctx, version, pluginCount }) => {
   const now = new Date();
   const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone });
   const harareDate = now.toLocaleDateString('en-US', { timeZone: config.timeZone });
   const uptime = `${process.uptime().toFixed(0)}s`;
   const ram = `${(os.totalmem() / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  const userId = ctx?.from?.id || 'Unknown';
   
   const menu = `
 ╭━━〔 CYBIX-V1 MENU 〕━━╮
 │ ✦ Prefix : [ . ] or [ / ]
 │ ✦ Owner : ${config.ownerId}
-│ ✦ User : ${ctx?.from?.first_name || 'User'}
+│ ✦ User : ${ctx?.from?.first_name || 'User'} (${userId})
+│ ✦ Plugins : ${pluginCount}
 │ ✦ Version : ${version}
 │ ✦ Uptime : ${uptime}
 │ ✦ Time Now : ${harareTime}
@@ -118,5 +119,5 @@ module.exports = async (bot, sendBanner, config, ctx, version) => {
 ╰━━━━━━━━━━━━━━━━━⊷
 `;
   
-  await sendBanner(ctx, menu);
+  sendBanner(ctx, menu);
 };
