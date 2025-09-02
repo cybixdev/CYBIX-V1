@@ -1,12 +1,19 @@
 services:
   - type: web
-    name: cybix-v1
+    name: cybix-bot
     env: node
-    plan: free
-    buildCommand: npm install
-    startCommand: node index.js
+    plan: starter
+    buildCommand: 'npm install'
+    startCommand: 'node index.js'
     envVars:
       - key: BOT_TOKEN
         sync: false
       - key: OWNER_ID
-        sync: false
+        value: "YOUR_TELEGRAM_USER_ID"
+      - key: DEVELOPER
+        value: "@cybixdev"
+      - key: PORT
+        value: "3000"
+    autoDeploy: true
+    repo: hacknetmo/cybix-bot
+    branch: main
