@@ -8,12 +8,12 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID || "0";
 const DEVELOPER = process.env.DEVELOPER || "@cybixdev";
 const PORT = process.env.PORT || 3000;
-const BANNER = 'https://i.imgur.com/X34jPIr.jpeg';
+const BANNER = 'https://files.catbox.moe/bzhmpr.jpg';
 
 const CHANNEL_BUTTONS = [
   [Markup.button.url('Whatsapp Channel', 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X')],
   [Markup.button.url('Telegram Channel', 'https://t.me/cybixtech')],
-  [Markup.button.url('Github Repo', 'https://github.com/hacknetmo')]
+  [Markup.button.url('Github Repo', 'https://github.com/JadenAfrix1')]
 ];
 
 if (!BOT_TOKEN || !OWNER_ID || OWNER_ID === "0") {
@@ -82,16 +82,7 @@ function getMenuSection(menuName, pluginDir) {
 // --- Menu Sections ---
 const MENU_SECTIONS = [
   getMenuSection('AI MENU', path.join(__dirname, 'plugins/aiMenu')),
-  getMenuSection('DOWNLOAD MENU', path.join(__dirname, 'plugins/downloadMenu')),
-  getMenuSection('NSFW MENU', path.join(__dirname, 'plugins/nsfwMenu')),
-  getMenuSection('PORN MENU', path.join(__dirname, 'plugins/pornMenu')),
-  getMenuSection('HENTAI MENU', path.join(__dirname, 'plugins/hentaiMenu')),
-  getMenuSection('FUN MENU', path.join(__dirname, 'plugins/funMenu')),
-  getMenuSection('TOOLS MENU', path.join(__dirname, 'plugins/toolsMenu')),
-  getMenuSection('CONVERT MENU', path.join(__dirname, 'plugins/convertMenu')),
-  getMenuSection('OTHER MENU', path.join(__dirname, 'plugins/otherMenu')),
-  getMenuSection('ADMIN MENU', path.join(__dirname, 'plugins/adminMenu')),
-  getMenuSection('DEVELOPER MENU', path.join(__dirname, 'plugins/devMenu'))
+  // Add other menus here as needed (download, tools, etc)
 ];
 
 // ---- MAIN MENU HANDLER ----
@@ -108,7 +99,7 @@ async function sendMenu(ctx) {
     const totalMem = getTotalMem();
 
     let menuText =
-`╭━━━[ 𝐂𝐘𝐁𝐈𝐗 𝐕1 ]━━━
+`╭━━━[ 𝐂𝐘𝐁𝐈𝐗 𝐕1 MENU ]━━━
 ┃ 👤 User: ${user.username ? '@' + user.username : user.first_name}
 ┃ 🆔 ID: ${user.id}
 ┃ 👑 Owner: @cybixdev
