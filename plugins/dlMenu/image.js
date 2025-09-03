@@ -1,14 +1,15 @@
-const fetch = require('node-fetch');
-module.exports = (bot) => {
-  bot.command('image', async ctx => {
-    const q = ctx.message.text.replace('/image', '').trim();
-    if (!q) return ctx.reply('Usage: /image <search term>');
+const axios = require("axios");
+module.exports = {
+  run: async (ctx) => {
+    const query = ctx.message.text.split(" ").slice(1).join(" ");
+    if (!query) return ctx.reply("❌ Provide keyword for image.");
     try {
-      const res = await fetch(`https://api.waifu.pics/sfw/waifu`);
-      const json = await res.json();
-      ctx.replyWithPhoto(json.url);
-    } catch (e) {
-      ctx.reply('Error: ' + e.message);
+      // Using Unsplash API (demo, public endpoint)
+      const url = `https://source.unsplash.com/600x400/?${encodeURIComponent(query)}`;
+      await ctx.replyWithPhoto(url, { caption: `🖼️ Image for: ${query}` });
+    } catch (err) {
+      console.error(err);
+      ctx.reply("❌ Error fetching image.");
     }
-  });
+  }
 };
