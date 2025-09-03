@@ -9,23 +9,11 @@ const path = require('path');
 // Bot instance
 const bot = new Telegraf(config.botToken);
 
-// Channel buttons for banner
+// Channel buttons for banner & menu
 const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
   [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
 ]);
-
-// Banner sender (image-only, with channel buttons)
-const sendBannerOnly = async (ctx) => {
-  if (!ctx || typeof ctx.replyWithPhoto !== 'function') return;
-  await ctx.replyWithPhoto(
-    { url: config.bannerUrl },
-    {
-      ...channelButtons,
-      parse_mode: 'Markdown'
-    }
-  );
-};
 
 // Plugin loader (counts plugins)
 function loadPlugins(bot, sendBanner, config, baseDir = path.join(__dirname, 'plugins')) {
@@ -44,9 +32,9 @@ function loadPlugins(bot, sendBanner, config, baseDir = path.join(__dirname, 'pl
   if (fs.existsSync(baseDir)) walk(baseDir);
   return pluginCount;
 }
-const pluginCount = loadPlugins(bot, sendBannerOnly, config);
+const pluginCount = loadPlugins(bot, null, config);
 
-// Menu function
+// Menu function: sends banner+menu as one caption with only channel buttons
 function sendMenu(ctx) {
   const now = new Date();
   const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone });
@@ -169,20 +157,14 @@ function sendMenu(ctx) {
 ╰━━━━━━━━━━━━━━━━━⊷
 `;
 
-  // Inline buttons for the menu (customize as needed)
-  const menuButtons = Markup.inlineKeyboard([
-    [Markup.button.callback('❮ AI ❯', 'ai'), Markup.button.callback('❮ DL ❯', 'dl')],
-    [Markup.button.callback('❮ NSFW ❯', 'nsfw'), Markup.button.callback('❮ HENTAI ❯', 'hentai')],
-    [Markup.button.callback('❮ PORN ❯', 'porn'), Markup.button.callback('❮ ADULT ❯', 'adult')],
-    [Markup.button.callback('❮ DEVELOPER ❯', 'developer')],
-    [Markup.button.callback('❮ USEFUL ❯', 'useful'), Markup.button.callback('❮ FUN ❯', 'fun')]
-  ]);
-
-  // 1. Send banner image (no menu caption)
-  sendBannerOnly(ctx);
-
-  // 2. Send menu text (with buttons, no banner)
-  ctx.reply(menu, menuButtons);
+  ctx.replyWithPhoto(
+    { url: config.bannerUrl },
+    {
+      caption: menu,
+      ...channelButtons,
+      parse_mode: 'Markdown'
+    }
+  );
 }
 
 // Menu triggers
@@ -198,7 +180,14 @@ bot.hears(/^start$/i, sendMenu);
 bot.on('text', async ctx => {
   const cmd = ctx.message.text.trim();
   if (/^(\.|\/)?[a-zA-Z]+/.test(cmd)) {
-    await ctx.reply('❓ Unknown command. Type .menu or /menu or .start or /start to see all features.');
+    await ctx.replyWithPhoto(
+      { url: config.bannerUrl },
+      {
+        caption: `❓ Unknown command. Type .menu or /menu or .start or /start to see all features.`,
+        ...channelButtons,
+        parse_mode: 'Markdown'
+      }
+    );
   }
 });
 
