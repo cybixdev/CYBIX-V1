@@ -9,18 +9,19 @@ const path = require('path');
 // Bot instance
 const bot = new Telegraf(config.botToken);
 
-// Channel buttons for banner
+// Banner sender
 const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
   [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
 ]);
 
-// Banner sender (image-only, with channel buttons)
-const sendBannerOnly = async (ctx) => {
+const sendBanner = async (ctx, message, extra = {}) => {
   if (!ctx || typeof ctx.replyWithPhoto !== 'function') return;
   await ctx.replyWithPhoto(
     { url: config.bannerUrl },
     {
+      caption: message,
+      ...extra,
       ...channelButtons,
       parse_mode: 'Markdown'
     }
@@ -44,7 +45,7 @@ function loadPlugins(bot, sendBanner, config, baseDir = path.join(__dirname, 'pl
   if (fs.existsSync(baseDir)) walk(baseDir);
   return pluginCount;
 }
-const pluginCount = loadPlugins(bot, sendBannerOnly, config);
+const pluginCount = loadPlugins(bot, sendBanner, config);
 
 // Menu function
 function sendMenu(ctx) {
@@ -168,21 +169,7 @@ function sendMenu(ctx) {
 ┃ diss
 ╰━━━━━━━━━━━━━━━━━⊷
 `;
-
-  // Inline buttons for the menu (customize as needed)
-  const menuButtons = Markup.inlineKeyboard([
-    [Markup.button.callback('❮ AI ❯', 'ai'), Markup.button.callback('❮ DL ❯', 'dl')],
-    [Markup.button.callback('❮ NSFW ❯', 'nsfw'), Markup.button.callback('❮ HENTAI ❯', 'hentai')],
-    [Markup.button.callback('❮ PORN ❯', 'porn'), Markup.button.callback('❮ ADULT ❯', 'adult')],
-    [Markup.button.callback('❮ DEVELOPER ❯', 'developer')],
-    [Markup.button.callback('❮ USEFUL ❯', 'useful'), Markup.button.callback('❮ FUN ❯', 'fun')]
-  ]);
-
-  // 1. Send banner image (no menu caption)
-  sendBannerOnly(ctx);
-
-  // 2. Send menu text (with buttons, no banner)
-  ctx.reply(menu, menuButtons);
+  sendBanner(ctx, menu);
 }
 
 // Menu triggers
@@ -198,7 +185,7 @@ bot.hears(/^start$/i, sendMenu);
 bot.on('text', async ctx => {
   const cmd = ctx.message.text.trim();
   if (/^(\.|\/)?[a-zA-Z]+/.test(cmd)) {
-    await ctx.reply('❓ Unknown command. Type .menu or /menu or .start or /start to see all features.');
+    await sendBanner(ctx, `❓ Unknown command. Type .menu or /menu or .start or /start to see all features.`);
   }
 });
 
