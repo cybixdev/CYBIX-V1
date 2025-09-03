@@ -7,36 +7,49 @@ const fs = require('fs');
 const path = require('path');
 
 // Bot instance
+if (!config.botToken) throw new Error('Telegram bot token is missing in config.js');
 const bot = new Telegraf(config.botToken);
 
 // Channel buttons for menu
 const channelButtons = Markup.inlineKeyboard([
-  [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
-  [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
+  [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel || 'https://whatsapp.com')],
+  [Markup.button.url('📣 Telegram Channel', config.telegramChannel || 'https://t.me')]
 ]);
 
 // Plugin loader (counts plugins)
 function loadPlugins(bot, sendBanner, config, baseDir = path.join(__dirname, 'plugins')) {
   let pluginCount = 0;
-  function walk(dir) {
-    fs.readdirSync(dir).forEach(file => {
-      const full = path.join(dir, file);
-      if (fs.statSync(full).isDirectory()) {
-        walk(full);
-      } else if (file.endsWith('.js')) {
-        require(full)(bot, sendBanner, config);
-        pluginCount++;
-      }
-    });
+  if (fs.existsSync(baseDir)) {
+    function walk(dir) {
+      fs.readdirSync(dir).forEach(file => {
+        const full = path.join(dir, file);
+        if (fs.statSync(full).isDirectory()) {
+          walk(full);
+        } else if (file.endsWith('.js')) {
+          try {
+            require(full)(bot, sendBanner, config);
+            pluginCount++;
+          } catch (e) {
+            console.error(`Failed to load plugin: ${full}`, e);
+          }
+        }
+      });
+    }
+    walk(baseDir);
   }
-  if (fs.existsSync(baseDir)) walk(baseDir);
   return pluginCount;
 }
 const pluginCount = loadPlugins(bot, null, config);
 
-// Menu function: sends banner first (no buttons), then menu (with buttons)
+// Menu function: sends banner first (no buttons), then menu (with channel buttons)
 async function sendMenu(ctx) {
   try {
+    // 1. Send banner (no caption, no buttons)
+    await ctx.replyWithPhoto(
+      { url: config.bannerUrl || 'https://i.postimg.cc/L4NwW5WY/boykaxd.jpg' }
+    );
+
+    // 2. Build menu text
     const now = new Date();
     const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone || 'Africa/Harare' });
     const harareDate = now.toLocaleDateString('en-US', { timeZone: config.timeZone || 'Africa/Harare' });
@@ -49,7 +62,7 @@ async function sendMenu(ctx) {
     const menu = `
 ╭━━〔 CYBIX-V1 MENU 〕━━╮
 │ ✦ Prefix : [ . ] or [ / ]
-│ ✦ Owner : ${config.ownerId}
+│ ✦ Owner : ${config.ownerId || 'Unknown'}
 │ ✦ User : ${userName} (${userId})
 │ ✦ Plugins Loaded : ${pluginCount}
 │ ✦ Version : ${version}
@@ -158,17 +171,13 @@ async function sendMenu(ctx) {
 ╰━━━━━━━━━━━━━━━━━⊷
 `;
 
-    // 1. Send banner image only (no caption, no buttons)
-    await ctx.replyWithPhoto(
-      { url: config.bannerUrl }
-    );
-
-    // 2. Send menu text (with only channel buttons)
+    // 3. Send menu (with channel buttons)
     await ctx.reply(menu, {
       ...channelButtons,
       parse_mode: 'Markdown'
     });
   } catch (e) {
+    console.error('Menu error:', e);
     await ctx.reply('❌ Error sending menu: ' + e.message);
   }
 }
@@ -184,10 +193,10 @@ bot.hears(/^start$/i, sendMenu);
 
 // Unknown command fallback: banner only (no buttons/caption), then info with buttons
 bot.on('text', async ctx => {
-  const cmd = ctx.message.text.trim();
-  if (/^(\.|\/)?[a-zA-Z]+/.test(cmd)) {
+  const cmd = ctx.message?.text?.trim();
+  if (cmd && /^(\.|\/)?[a-zA-Z]+/.test(cmd)) {
     await ctx.replyWithPhoto(
-      { url: config.bannerUrl }
+      { url: config.bannerUrl || 'https://i.postimg.cc/L4NwW5WY/boykaxd.jpg' }
     );
     await ctx.reply(
       `❓ Unknown command. Type .menu or /menu or .start or /start to see all features.`,
