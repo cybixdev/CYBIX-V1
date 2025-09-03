@@ -13,7 +13,7 @@ if (!OWNER_ID) throw new Error('OWNER_ID not set in .env');
 
 const bot = new Telegraf(BOT_TOKEN);
 
-const BANNER_URL = 'https://files.catbox.moe/kdu5s1.jpg';
+const BANNER_URL = 'https://files.catbox.moe/vwtth1.jpg';
 const WHATSAPP_CHANNEL = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
 const TELEGRAM_CHANNEL = 'https://t.me/cybixtech';
 
