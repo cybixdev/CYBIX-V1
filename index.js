@@ -9,11 +9,23 @@ const path = require('path');
 // Bot instance
 const bot = new Telegraf(config.botToken);
 
-// Channel buttons for menu
+// Channel buttons for banner
 const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
   [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
 ]);
+
+// Banner sender (image-only, with channel buttons)
+const sendBannerOnly = async (ctx) => {
+  if (!ctx || typeof ctx.replyWithPhoto !== 'function') return;
+  await ctx.replyWithPhoto(
+    { url: config.bannerUrl },
+    {
+      ...channelButtons,
+      parse_mode: 'Markdown'
+    }
+  );
+};
 
 // Plugin loader (counts plugins)
 function loadPlugins(bot, sendBanner, config, baseDir = path.join(__dirname, 'plugins')) {
@@ -32,21 +44,20 @@ function loadPlugins(bot, sendBanner, config, baseDir = path.join(__dirname, 'pl
   if (fs.existsSync(baseDir)) walk(baseDir);
   return pluginCount;
 }
-const pluginCount = loadPlugins(bot, null, config);
+const pluginCount = loadPlugins(bot, sendBannerOnly, config);
 
-// Menu function: sends banner first (no buttons), then menu (with buttons)
-async function sendMenu(ctx) {
-  try {
-    const now = new Date();
-    const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone || 'Africa/Harare' });
-    const harareDate = now.toLocaleDateString('en-US', { timeZone: config.timeZone || 'Africa/Harare' });
-    const uptime = `${process.uptime().toFixed(0)}s`;
-    const ram = `${(os.totalmem() / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-    const userId = ctx?.from?.id || 'Unknown';
-    const userName = ctx?.from?.first_name || 'User';
-    const version = pkg.version;
+// Menu function
+function sendMenu(ctx) {
+  const now = new Date();
+  const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone });
+  const harareDate = now.toLocaleDateString('en-US', { timeZone: config.timeZone });
+  const uptime = `${process.uptime().toFixed(0)}s`;
+  const ram = `${(os.totalmem() / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  const userId = ctx?.from?.id || 'Unknown';
+  const userName = ctx?.from?.first_name || 'User';
+  const version = pkg.version;
 
-    const menu = `
+  const menu = `
 ╭━━〔 CYBIX-V1 MENU 〕━━╮
 │ ✦ Prefix : [ . ] or [ / ]
 │ ✦ Owner : ${config.ownerId}
@@ -158,19 +169,20 @@ async function sendMenu(ctx) {
 ╰━━━━━━━━━━━━━━━━━⊷
 `;
 
-    // 1. Send banner image only (no caption, no buttons)
-    await ctx.replyWithPhoto(
-      { url: config.bannerUrl }
-    );
+  // Inline buttons for the menu (customize as needed)
+  const menuButtons = Markup.inlineKeyboard([
+    [Markup.button.callback('❮ AI ❯', 'ai'), Markup.button.callback('❮ DL ❯', 'dl')],
+    [Markup.button.callback('❮ NSFW ❯', 'nsfw'), Markup.button.callback('❮ HENTAI ❯', 'hentai')],
+    [Markup.button.callback('❮ PORN ❯', 'porn'), Markup.button.callback('❮ ADULT ❯', 'adult')],
+    [Markup.button.callback('❮ DEVELOPER ❯', 'developer')],
+    [Markup.button.callback('❮ USEFUL ❯', 'useful'), Markup.button.callback('❮ FUN ❯', 'fun')]
+  ]);
 
-    // 2. Send menu text (with only channel buttons)
-    await ctx.reply(menu, {
-      ...channelButtons,
-      parse_mode: 'Markdown'
-    });
-  } catch (e) {
-    await ctx.reply('❌ Error sending menu: ' + e.message);
-  }
+  // 1. Send banner image (no menu caption)
+  sendBannerOnly(ctx);
+
+  // 2. Send menu text (with buttons, no banner)
+  ctx.reply(menu, menuButtons);
 }
 
 // Menu triggers
@@ -182,37 +194,24 @@ bot.hears(/^\/(menu|start)$/i, sendMenu);
 bot.hears(/^menu$/i, sendMenu);
 bot.hears(/^start$/i, sendMenu);
 
-// Unknown command fallback: banner only (no buttons/caption), then info with buttons
+// Unknown command fallback
 bot.on('text', async ctx => {
   const cmd = ctx.message.text.trim();
   if (/^(\.|\/)?[a-zA-Z]+/.test(cmd)) {
-    await ctx.replyWithPhoto(
-      { url: config.bannerUrl }
-    );
-    await ctx.reply(
-      `❓ Unknown command. Type .menu or /menu or .start or /start to see all features.`,
-      { ...channelButtons, parse_mode: 'Markdown' }
-    );
+    await ctx.reply('❓ Unknown command. Type .menu or /menu or .start or /start to see all features.');
   }
 });
 
 // Express keepalive for Render/Vercel
-const PORT = process.env.PORT || config.port || 3000;
-const app = express();
-app.get('/', (req, res) => res.send('CYBIX-V1 Bot is running.'));
-app.listen(PORT, () => {
-  console.log(`Express server running on port ${PORT}`);
-});
-
-// Start bot, handle errors gracefully
-bot.launch()
-  .then(() => {
-    console.log('CYBIX-V1 is running!');
-  })
-  .catch(e => {
-    console.error('Bot failed to launch:', e);
+if (process.env.PORT) {
+  const app = express();
+  app.get('/', (req, res) => res.send('CYBIX-V1 Bot is running.'));
+  app.listen(config.port, () => {
+    console.log(`Express server running on port ${config.port}`);
   });
+}
 
-// Graceful shutdown for Render/Vercel
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+// Start bot
+bot.launch().then(() => {
+  console.log('CYBIX-V1 is running!');
+});
