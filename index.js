@@ -9,7 +9,7 @@ const path = require('path');
 // Bot instance
 const bot = new Telegraf(config.botToken);
 
-// Channel buttons for banner & menu
+// Channel buttons for menu
 const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('🌐 Whatsapp Channel', config.whatsappChannel)],
   [Markup.button.url('📣 Telegram Channel', config.telegramChannel)]
@@ -34,18 +34,19 @@ function loadPlugins(bot, sendBanner, config, baseDir = path.join(__dirname, 'pl
 }
 const pluginCount = loadPlugins(bot, null, config);
 
-// Menu function: sends banner+menu as one caption with only channel buttons
-function sendMenu(ctx) {
-  const now = new Date();
-  const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone });
-  const harareDate = now.toLocaleDateString('en-US', { timeZone: config.timeZone });
-  const uptime = `${process.uptime().toFixed(0)}s`;
-  const ram = `${(os.totalmem() / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-  const userId = ctx?.from?.id || 'Unknown';
-  const userName = ctx?.from?.first_name || 'User';
-  const version = pkg.version;
+// Menu function: sends banner first (no buttons), then menu (with buttons)
+async function sendMenu(ctx) {
+  try {
+    const now = new Date();
+    const harareTime = now.toLocaleTimeString('en-US', { timeZone: config.timeZone || 'Africa/Harare' });
+    const harareDate = now.toLocaleDateString('en-US', { timeZone: config.timeZone || 'Africa/Harare' });
+    const uptime = `${process.uptime().toFixed(0)}s`;
+    const ram = `${(os.totalmem() / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    const userId = ctx?.from?.id || 'Unknown';
+    const userName = ctx?.from?.first_name || 'User';
+    const version = pkg.version;
 
-  const menu = `
+    const menu = `
 ╭━━〔 CYBIX-V1 MENU 〕━━╮
 │ ✦ Prefix : [ . ] or [ / ]
 │ ✦ Owner : ${config.ownerId}
@@ -157,14 +158,19 @@ function sendMenu(ctx) {
 ╰━━━━━━━━━━━━━━━━━⊷
 `;
 
-  ctx.replyWithPhoto(
-    { url: config.bannerUrl },
-    {
-      caption: menu,
+    // 1. Send banner image only (no caption, no buttons)
+    await ctx.replyWithPhoto(
+      { url: config.bannerUrl }
+    );
+
+    // 2. Send menu text (with only channel buttons)
+    await ctx.reply(menu, {
       ...channelButtons,
       parse_mode: 'Markdown'
-    }
-  );
+    });
+  } catch (e) {
+    await ctx.reply('❌ Error sending menu: ' + e.message);
+  }
 }
 
 // Menu triggers
@@ -176,31 +182,37 @@ bot.hears(/^\/(menu|start)$/i, sendMenu);
 bot.hears(/^menu$/i, sendMenu);
 bot.hears(/^start$/i, sendMenu);
 
-// Unknown command fallback
+// Unknown command fallback: banner only (no buttons/caption), then info with buttons
 bot.on('text', async ctx => {
   const cmd = ctx.message.text.trim();
   if (/^(\.|\/)?[a-zA-Z]+/.test(cmd)) {
     await ctx.replyWithPhoto(
-      { url: config.bannerUrl },
-      {
-        caption: `❓ Unknown command. Type .menu or /menu or .start or /start to see all features.`,
-        ...channelButtons,
-        parse_mode: 'Markdown'
-      }
+      { url: config.bannerUrl }
+    );
+    await ctx.reply(
+      `❓ Unknown command. Type .menu or /menu or .start or /start to see all features.`,
+      { ...channelButtons, parse_mode: 'Markdown' }
     );
   }
 });
 
 // Express keepalive for Render/Vercel
-if (process.env.PORT) {
-  const app = express();
-  app.get('/', (req, res) => res.send('CYBIX-V1 Bot is running.'));
-  app.listen(config.port, () => {
-    console.log(`Express server running on port ${config.port}`);
-  });
-}
-
-// Start bot
-bot.launch().then(() => {
-  console.log('CYBIX-V1 is running!');
+const PORT = process.env.PORT || config.port || 3000;
+const app = express();
+app.get('/', (req, res) => res.send('CYBIX-V1 Bot is running.'));
+app.listen(PORT, () => {
+  console.log(`Express server running on port ${PORT}`);
 });
+
+// Start bot, handle errors gracefully
+bot.launch()
+  .then(() => {
+    console.log('CYBIX-V1 is running!');
+  })
+  .catch(e => {
+    console.error('Bot failed to launch:', e);
+  });
+
+// Graceful shutdown for Render/Vercel
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
