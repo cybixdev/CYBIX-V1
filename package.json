@@ -1,0 +1,14 @@
+{
+  "name": "queen-nomi-v1",
+  "version": "1.0.0",
+  "description": "QUEEN-NOMI V1 Telegram Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "telegraf": "^4.15.0",
+    "dotenv": "^16.4.0"
+  }
+}
