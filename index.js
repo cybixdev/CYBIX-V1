@@ -3,6 +3,7 @@ const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 const path = require('path');
 
+// --- Configuration ---
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
 const PORT = process.env.PORT || 3000;
@@ -13,6 +14,7 @@ if (!OWNER_ID) throw new Error('OWNER_ID not set in .env');
 
 const bot = new Telegraf(BOT_TOKEN);
 
+// --- Utility Functions ---
 function markupButtons() {
   return Markup.inlineKeyboard([
     [Markup.button.url('📲 Whatsapp Channel', 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X')],
@@ -30,9 +32,10 @@ function getBotVersion() {
   }
 }
 
+// --- Menu Content (Unchanged, Your Structure) ---
 function getMenuText(ctx) {
   const now = new Date();
-  const user = ctx.from.username ? '@' + ctx.from.username : ctx.from.first_name;
+  const user = ctx.from?.username ? '@' + ctx.from.username : ctx.from?.first_name || 'User';
   const uptimeSec = process.uptime();
   const hours = Math.floor(uptimeSec / 3600);
   const minutes = Math.floor((uptimeSec % 3600) / 60);
@@ -53,7 +56,6 @@ function getMenuText(ctx) {
   countPlugins(path.join(__dirname, 'plugins'));
   const version = getBotVersion();
   
-  // This is your exact menu structure, unchanged, in list form.
   return `
 ╭━━〔 QUEEN-NOMI V${version} 〕━━╮
 │ ✦ Prefix : . or /
@@ -173,7 +175,7 @@ function getMenuText(ctx) {
 `;
 }
 
-// Always send menu with banner (photo + text)
+// --- Banner Sender ---
 async function sendBanner(ctx, caption, extra = {}) {
   try {
     await ctx.replyWithPhoto({ url: BANNER_URL },
@@ -188,7 +190,7 @@ async function sendBanner(ctx, caption, extra = {}) {
   }
 }
 
-// Load plugins and pass sendBanner and OWNER_ID
+// --- Plugin Loader ---
 function loadPlugins(bot) {
   const pluginsPath = path.join(__dirname, 'plugins');
   if (!fs.existsSync(pluginsPath)) return;
@@ -201,7 +203,7 @@ function loadPlugins(bot) {
         try {
           require(fullPath)(bot, sendBanner, OWNER_ID);
         } catch (e) {
-          console.error(`Plugin error in ${fullPath}:`, e.message);
+          console.error(`Plugin error in ${fullPath}:`, e);
         }
       }
     });
@@ -210,35 +212,40 @@ function loadPlugins(bot) {
 }
 loadPlugins(bot);
 
-// Menu handler
+// --- Menu Handler ---
 async function sendMenuWithBanner(ctx) {
   await sendBanner(ctx, getMenuText(ctx));
 }
 
-// Respond to .menu, /menu, and /start
+// --- Command Handlers ---
 bot.start(sendMenuWithBanner);
 bot.hears(/^(\.menu|\/menu)$/i, sendMenuWithBanner);
 
-// Error handler
+// --- Error Handling ---
 bot.catch((err, ctx) => {
   console.error('Bot error:', err);
-  try {
-    ctx.reply('🚫 Oops! Something went wrong. Please try again.');
-  } catch {}
+  // Only reply if message context is present
+  if (ctx && ctx.reply) {
+    try {
+      ctx.reply('🚫 Oops! Something went wrong. Please try again.');
+    } catch {}
+  }
 });
 
-// Launch and Web Server for Render
+// --- Launch ---
 bot.launch().then(() => {
   console.log('QUEEN-NOMI V' + getBotVersion() + ' Bot started!');
 }).catch((e) => {
   console.error('Bot failed to start:', e.message);
 });
 
+// --- Web Server for Render ---
 if (process.env.RENDER || process.env.PORT) {
   require('http')
     .createServer((req, res) => res.end('QUEEN-NOMI V1 running.'))
     .listen(PORT, () => console.log(`Listening on port ${PORT}`));
 }
 
+// --- Clean Exit ---
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
