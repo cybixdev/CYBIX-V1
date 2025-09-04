@@ -7,9 +7,6 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
 const PORT = process.env.PORT || 3000;
 const BANNER_URL = 'https://files.catbox.moe/kdu5s1.jpg';
-const WHATSAPP_CHANNEL = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
-const TELEGRAM_CHANNEL = 'https://t.me/cybixtech';
-const DEVELOPER_LINK = 'https://t.me/cybixdev';
 
 if (!BOT_TOKEN) throw new Error('BOT_TOKEN not set in .env');
 if (!OWNER_ID) throw new Error('OWNER_ID not set in .env');
@@ -18,9 +15,9 @@ const bot = new Telegraf(BOT_TOKEN);
 
 function markupButtons() {
   return Markup.inlineKeyboard([
-    [Markup.button.url('📲 Whatsapp Channel', WHATSAPP_CHANNEL)],
-    [Markup.button.url('🚀 Telegram Channel', TELEGRAM_CHANNEL)],
-    [Markup.button.url('👑 Developer', DEVELOPER_LINK)]
+    [Markup.button.url('📲 Whatsapp Channel', 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X')],
+    [Markup.button.url('🚀 Telegram Channel', 'https://t.me/cybixtech')],
+    [Markup.button.url('👑 Developer', 'https://t.me/cybixdev')]
   ]);
 }
 
@@ -56,6 +53,7 @@ function getMenuText(ctx) {
   countPlugins(path.join(__dirname, 'plugins'));
   const version = getBotVersion();
   
+  // This is your exact menu structure, unchanged, in list form.
   return `
 ╭━━〔 QUEEN-NOMI V${version} 〕━━╮
 │ ✦ Prefix : . or /
@@ -175,6 +173,7 @@ function getMenuText(ctx) {
 `;
 }
 
+// Always send menu with banner (photo + text)
 async function sendBanner(ctx, caption, extra = {}) {
   try {
     await ctx.replyWithPhoto({ url: BANNER_URL },
@@ -182,13 +181,14 @@ async function sendBanner(ctx, caption, extra = {}) {
       caption,
       ...extra,
       ...markupButtons(),
-      parse_mode: 'Markdown',
+      parse_mode: undefined, // plain text for max compatibility
     });
   } catch (err) {
-    await ctx.reply(caption, { ...markupButtons(), parse_mode: 'Markdown' });
+    await ctx.reply(caption, { ...markupButtons(), parse_mode: undefined });
   }
 }
 
+// Load plugins and pass sendBanner and OWNER_ID
 function loadPlugins(bot) {
   const pluginsPath = path.join(__dirname, 'plugins');
   if (!fs.existsSync(pluginsPath)) return;
@@ -210,14 +210,16 @@ function loadPlugins(bot) {
 }
 loadPlugins(bot);
 
+// Menu handler
 async function sendMenuWithBanner(ctx) {
   await sendBanner(ctx, getMenuText(ctx));
 }
 
-bot.command('menu', sendMenuWithBanner);
-bot.command('start', sendMenuWithBanner);
-bot.hears(/^\.menu$/, sendMenuWithBanner);
+// Respond to .menu, /menu, and /start
+bot.start(sendMenuWithBanner);
+bot.hears(/^(\.menu|\/menu)$/i, sendMenuWithBanner);
 
+// Error handler
 bot.catch((err, ctx) => {
   console.error('Bot error:', err);
   try {
@@ -225,6 +227,7 @@ bot.catch((err, ctx) => {
   } catch {}
 });
 
+// Launch and Web Server for Render
 bot.launch().then(() => {
   console.log('QUEEN-NOMI V' + getBotVersion() + ' Bot started!');
 }).catch((e) => {
