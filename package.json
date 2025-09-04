@@ -1,6 +1,6 @@
 {
   "name": "queen-nomi-v1",
-  "version": "1.0.0",
+  "version": "1.2.5",
   "description": "QUEEN-NOMI V1 Telegram Bot",
   "main": "index.js",
   "scripts": {

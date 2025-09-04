@@ -6,28 +6,41 @@ const path = require('path');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
 const PORT = process.env.PORT || 3000;
+const BANNER_URL = 'https://files.catbox.moe/kdu5s1.jpg';
+const WHATSAPP_CHANNEL = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
+const TELEGRAM_CHANNEL = 'https://t.me/cybixtech';
+const DEVELOPER_LINK = 'https://t.me/cybixdev';
 
 if (!BOT_TOKEN) throw new Error('BOT_TOKEN not set in .env');
 if (!OWNER_ID) throw new Error('OWNER_ID not set in .env');
 
 const bot = new Telegraf(BOT_TOKEN);
 
-const BANNER_URL = 'https://files.catbox.moe/kdu5s1.jpg';
-const WHATSAPP_CHANNEL = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
-const TELEGRAM_CHANNEL = 'https://t.me/cybixtech';
-
 function markupButtons() {
   return Markup.inlineKeyboard([
     [Markup.button.url('📲 Whatsapp Channel', WHATSAPP_CHANNEL)],
     [Markup.button.url('🚀 Telegram Channel', TELEGRAM_CHANNEL)],
-    [Markup.button.url('👑 Developer', 'https://t.me/cybixdev')]
+    [Markup.button.url('👑 Developer', DEVELOPER_LINK)]
   ]);
+}
+
+function getBotVersion() {
+  try {
+    const pkg = require('./package.json');
+    return pkg.version || 'unknown';
+  } catch {
+    return 'unknown';
+  }
 }
 
 function getMenuText(ctx) {
   const now = new Date();
   const user = ctx.from.username ? '@' + ctx.from.username : ctx.from.first_name;
-  const uptime = process.uptime().toFixed(0) + 's';
+  const uptimeSec = process.uptime();
+  const hours = Math.floor(uptimeSec / 3600);
+  const minutes = Math.floor((uptimeSec % 3600) / 60);
+  const seconds = Math.floor(uptimeSec % 60);
+  const uptime = `${hours}h ${minutes}m ${seconds}s`;
   const ram = (process.memoryUsage().rss / 1024 / 1024).toFixed(1) + 'MB';
   const mem = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1) + 'MB';
   let pluginsCount = 0;
@@ -41,14 +54,15 @@ function getMenuText(ctx) {
     });
   }
   countPlugins(path.join(__dirname, 'plugins'));
+  const version = getBotVersion();
   
   return `
-╭━━〔 QUEEN-NOMI V1 〕━━╮
+╭━━〔 QUEEN-NOMI V${version} 〕━━╮
 │ ✦ Prefix : . or /
 │ ✦ Owner : @cybixdev
 │ ✦ User : ${user}
 │ ✦ Plugins: ${pluginsCount}
-│ ✦ Version : 1.0.0
+│ ✦ Version : ${version}
 │ ✦ Uptime : ${uptime}
 │ ✦ Time Now : ${now.toISOString().slice(11, 19)}
 │ ✦ Date Today : ${now.toISOString().slice(0, 10)}
@@ -158,10 +172,23 @@ function getMenuText(ctx) {
 ┃ • .listusers
 ┃ • .logs
 ╰━━━━━━━━━━━━
-  `;
+`;
 }
 
-// Plugin loader (auto-loads plugins from folders)
+async function sendBanner(ctx, caption, extra = {}) {
+  try {
+    await ctx.replyWithPhoto({ url: BANNER_URL },
+    {
+      caption,
+      ...extra,
+      ...markupButtons(),
+      parse_mode: 'Markdown',
+    });
+  } catch (err) {
+    await ctx.reply(caption, { ...markupButtons(), parse_mode: 'Markdown' });
+  }
+}
+
 function loadPlugins(bot) {
   const pluginsPath = path.join(__dirname, 'plugins');
   if (!fs.existsSync(pluginsPath)) return;
@@ -170,41 +197,39 @@ function loadPlugins(bot) {
     fs.readdirSync(dir).forEach((file) => {
       const fullPath = path.join(dir, file);
       if (fs.statSync(fullPath).isDirectory()) walk(fullPath);
-      else if (file.endsWith('.js')) require(fullPath)(bot, sendBanner, OWNER_ID);
+      else if (file.endsWith('.js')) {
+        try {
+          require(fullPath)(bot, sendBanner, OWNER_ID);
+        } catch (e) {
+          console.error(`Plugin error in ${fullPath}:`, e.message);
+        }
+      }
     });
   }
   walk(pluginsPath);
 }
 loadPlugins(bot);
 
-// Always send banner with menu
 async function sendMenuWithBanner(ctx) {
-  try {
-    await ctx.replyWithPhoto({ url: BANNER_URL },
-    {
-      caption: getMenuText(ctx),
-      ...markupButtons(),
-      parse_mode: 'Markdown'
-    });
-  } catch (err) {
-    // fallback to text if photo fails
-    await ctx.reply(getMenuText(ctx), { ...markupButtons(), parse_mode: 'Markdown' });
-  }
+  await sendBanner(ctx, getMenuText(ctx));
 }
 
-// Menu and start command handlers (both prefixes)
 bot.command('menu', sendMenuWithBanner);
 bot.command('start', sendMenuWithBanner);
 bot.hears(/^\.menu$/, sendMenuWithBanner);
 
-// Error handling
 bot.catch((err, ctx) => {
   console.error('Bot error:', err);
-  ctx.reply('🚫 Oops! Something went wrong. Please try again.');
+  try {
+    ctx.reply('🚫 Oops! Something went wrong. Please try again.');
+  } catch {}
 });
 
-bot.launch();
-console.log('QUEEN-NOMI V1 Bot started!');
+bot.launch().then(() => {
+  console.log('QUEEN-NOMI V' + getBotVersion() + ' Bot started!');
+}).catch((e) => {
+  console.error('Bot failed to start:', e.message);
+});
 
 if (process.env.RENDER || process.env.PORT) {
   require('http')
