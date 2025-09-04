@@ -20,44 +20,16 @@ function markupButtons() {
   return Markup.inlineKeyboard([
     [Markup.button.url('📲 Whatsapp Channel', WHATSAPP_CHANNEL)],
     [Markup.button.url('🚀 Telegram Channel', TELEGRAM_CHANNEL)],
+    [Markup.button.url('👑 Developer', 'https://t.me/cybixdev')]
   ]);
 }
-
-async function sendBanner(ctx, caption, extra = {}) {
-  try {
-    await ctx.replyWithPhoto({ url: BANNER_URL },
-    {
-      caption,
-      ...extra,
-      ...markupButtons(),
-    });
-  } catch (err) {
-    await ctx.reply(caption, markupButtons());
-  }
-}
-
-// Plugin loader (for future plugins)
-function loadPlugins(bot) {
-  const pluginsPath = path.join(__dirname, 'plugins');
-  if (!fs.existsSync(pluginsPath)) return;
-  
-  function walk(dir) {
-    fs.readdirSync(dir).forEach((file) => {
-      const fullPath = path.join(dir, file);
-      if (fs.statSync(fullPath).isDirectory()) walk(fullPath);
-      else if (file.endsWith('.js')) require(fullPath)(bot, sendBanner, OWNER_ID);
-    });
-  }
-  walk(pluginsPath);
-}
-loadPlugins(bot);
 
 function getMenuText(ctx) {
   const now = new Date();
   const user = ctx.from.username ? '@' + ctx.from.username : ctx.from.first_name;
   const uptime = process.uptime().toFixed(0) + 's';
-  const ram = (process.memoryUsage().rss / 1024 / 1024).toFixed(2) + 'MB';
-  const mem = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2) + 'MB';
+  const ram = (process.memoryUsage().rss / 1024 / 1024).toFixed(1) + 'MB';
+  const mem = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1) + 'MB';
   let pluginsCount = 0;
   
   function countPlugins(dir) {
@@ -189,17 +161,41 @@ function getMenuText(ctx) {
   `;
 }
 
-// Both prefix handlers for menu
-const menuHandler = async (ctx) => {
-  await sendBanner(ctx, getMenuText(ctx));
-};
+// Plugin loader (auto-loads plugins from folders)
+function loadPlugins(bot) {
+  const pluginsPath = path.join(__dirname, 'plugins');
+  if (!fs.existsSync(pluginsPath)) return;
+  
+  function walk(dir) {
+    fs.readdirSync(dir).forEach((file) => {
+      const fullPath = path.join(dir, file);
+      if (fs.statSync(fullPath).isDirectory()) walk(fullPath);
+      else if (file.endsWith('.js')) require(fullPath)(bot, sendBanner, OWNER_ID);
+    });
+  }
+  walk(pluginsPath);
+}
+loadPlugins(bot);
 
-// Command: /menu and /start
-bot.command('menu', menuHandler);
-bot.command('start', menuHandler);
+// Always send banner with menu
+async function sendMenuWithBanner(ctx) {
+  try {
+    await ctx.replyWithPhoto({ url: BANNER_URL },
+    {
+      caption: getMenuText(ctx),
+      ...markupButtons(),
+      parse_mode: 'Markdown'
+    });
+  } catch (err) {
+    // fallback to text if photo fails
+    await ctx.reply(getMenuText(ctx), { ...markupButtons(), parse_mode: 'Markdown' });
+  }
+}
 
-// Dot prefix handler (for .menu etc)
-bot.hears(/^\.menu$/, menuHandler);
+// Menu and start command handlers (both prefixes)
+bot.command('menu', sendMenuWithBanner);
+bot.command('start', sendMenuWithBanner);
+bot.hears(/^\.menu$/, sendMenuWithBanner);
 
 // Error handling
 bot.catch((err, ctx) => {
