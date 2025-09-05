@@ -23,6 +23,7 @@ const channelButtons = Markup.inlineKeyboard([
 
 let PREFIXES = ['.', '/'];
 
+// Plugin loader (ready for plugin files)
 const plugins = {};
 function loadPlugins() {
   const pluginsPath = path.join(__dirname, 'plugins');
@@ -36,7 +37,6 @@ function loadPlugins() {
           try {
             plugins[pluginName] = require(path.join(categoryPath, file));
           } catch (e) {
-            // Log & skip broken plugin, never crash
             console.error(`[Plugin Loader] Failed to load ${pluginName}:`, e.message);
           }
         }
@@ -178,11 +178,14 @@ async function sendBannerResponse(ctx, text) {
   }
 }
 
-// Start and menu command
+// Menu triggers
 bot.start(async ctx => {
   await sendBannerResponse(ctx, getMenuText(ctx));
 });
 bot.command('menu', async ctx => {
+  await sendBannerResponse(ctx, getMenuText(ctx));
+});
+bot.hears(/^\.menu$/, async ctx => {
   await sendBannerResponse(ctx, getMenuText(ctx));
 });
 
@@ -207,8 +210,6 @@ bot.on('text', async ctx => {
     } catch (e) {
       await sendBannerResponse(ctx, '❌ Error in plugin.');
     }
-  } else {
-    await sendBannerResponse(ctx, getMenuText(ctx));
   }
 });
 
