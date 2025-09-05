@@ -2,9 +2,7 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 
-// ENV
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
 const PORT = process.env.PORT || 3000;
@@ -16,16 +14,9 @@ let bannerUrl = 'https://files.catbox.moe/7dozqn.jpg';
 let startTime = Date.now();
 let users = new Set();
 
-// Persistent users
 const usersFile = path.join(__dirname, 'users.json');
-function saveUsers() {
-  try { fs.writeFileSync(usersFile, JSON.stringify(Array.from(users))); } catch {}
-}
-function loadUsers() {
-  if (fs.existsSync(usersFile)) {
-    try { users = new Set(JSON.parse(fs.readFileSync(usersFile, 'utf8'))); } catch {}
-  }
-}
+function saveUsers() { try { fs.writeFileSync(usersFile, JSON.stringify(Array.from(users))); } catch {} }
+function loadUsers() { if (fs.existsSync(usersFile)) { try { users = new Set(JSON.parse(fs.readFileSync(usersFile, 'utf8'))); } catch {} } }
 loadUsers();
 
 const buttons = Markup.inlineKeyboard([
@@ -42,7 +33,13 @@ function menuCaption(ctx) {
   const user = ctx.from || {};
   const memory = `${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`;
   const speed = `${Math.floor(Math.random() * 100)}ms`;
-  const plugins = fs.existsSync('./plugins') ? fs.readdirSync('./plugins').filter(f=>f.endsWith('.js')).length : 0;
+  const plugins = fs.existsSync('./plugins') && fs.readdirSync('./plugins').reduce((acc, folder) => {
+    const folderPath = path.join('./plugins', folder);
+    if (fs.lstatSync(folderPath).isDirectory()) {
+      acc += fs.readdirSync(folderPath).filter(f => f.endsWith('.js')).length;
+    }
+    return acc;
+  }, 0);
   const now = new Date();
   return `
 ╭━───〔 ${botName} 〕───━━╮
@@ -158,7 +155,6 @@ function addUser(ctx) {
   }
 }
 
-// Dev menu commands
 bot.command('statics', ctx => {
   addUser(ctx);
   let mem = `${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`;
@@ -175,7 +171,7 @@ bot.command('mode', ctx => {
 });
 bot.command('logs', ctx => {
   addUser(ctx);
-  sendBanner(ctx, 'Logs: Feature not implemented. Add a logger to support.');
+  sendBanner(ctx, 'Logs: Feature not implemented.');
 });
 bot.command('info', ctx => {
   addUser(ctx);
@@ -206,7 +202,6 @@ bot.command('setbotname', ctx => {
   sendBanner(ctx, `Bot name changed to: ${botName}`);
 });
 
-// Menu commands
 ['menu', 'start', 'bot'].forEach(cmd => {
   bot.command(cmd, ctx => {
     addUser(ctx);
@@ -218,7 +213,6 @@ bot.command('setbotname', ctx => {
   });
 });
 
-// Main plugin handler (auto-load plugins from ./plugins)
 bot.on('text', async ctx => {
   addUser(ctx);
   const text = ctx.message.text;
@@ -254,14 +248,9 @@ bot.catch((err, ctx) => {
   console.error('Bot Error:', err);
 });
 
-// Launch & keepalive
-if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
-  bot.launch({ webhook: { port: PORT } });
-  console.log('Bot running on webhook mode (Render/Production)');
-} else {
-  bot.launch();
-  console.log('Bot running in polling mode (Termux/Local)');
-}
+bot.launch();
+console.log('Bot running in polling mode (Render/Termux/Any Node.js host)');
+
 if (process.env.RENDER) {
   require('http').createServer((_, res) => res.end(`${botName} Bot Running`)).listen(PORT);
 }
