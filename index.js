@@ -5,7 +5,6 @@ const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
-const PORT = process.env.PORT || 3000;
 
 if (!BOT_TOKEN || !OWNER_ID) {
   throw new Error('BOT_TOKEN and OWNER_ID must be set in .env');
@@ -23,7 +22,6 @@ const channelButtons = Markup.inlineKeyboard([
 
 let PREFIXES = ['.', '/'];
 
-// Plugin loader (ready for plugin files)
 const plugins = {};
 function loadPlugins() {
   const pluginsPath = path.join(__dirname, 'plugins');
@@ -213,8 +211,8 @@ bot.on('text', async ctx => {
   }
 });
 
-// Keepalive for Render/Termux
-bot.launch({ webhook: { port: PORT } });
+// Use polling — works everywhere, no config needed
+bot.launch();
 console.log('CYBIX V1 Bot is running.');
 
 // Graceful shutdown
