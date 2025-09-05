@@ -5,7 +5,7 @@ const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
-const OWNER_USERNAME = 'cybixdev'; // Owner username for display
+const OWNER_USERNAME = 'cybixdev';
 
 if (!BOT_TOKEN || !OWNER_ID) {
   throw new Error('BOT_TOKEN and OWNER_ID must be set in .env');
@@ -24,7 +24,6 @@ const channelButtons = Markup.inlineKeyboard([
 
 let PREFIXES = ['.', '/'];
 
-// Plugin loader
 const plugins = {};
 function loadPlugins() {
   const pluginsPath = path.join(__dirname, 'plugins');
@@ -175,10 +174,9 @@ async function getMenuText(ctx) {
 `.trim();
 }
 
-// Sends banner, menu, and buttons as one message (mediaGroup for perfect layout)
+// Send menu as one message: banner, menu text, and buttons all together
 async function sendFullMenu(ctx) {
   const menuText = await getMenuText(ctx);
-
   try {
     await ctx.replyWithPhoto(
       { url: BANNER_URL },
@@ -224,10 +222,8 @@ bot.on('text', async ctx => {
   }
 });
 
-// Use polling — works everywhere, no config needed
 bot.launch();
 console.log('CYBIX V1 Bot is running.');
 
-// Graceful shutdown
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
