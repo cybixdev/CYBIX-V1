@@ -1,63 +1,55 @@
-require('dotenv').config();
-const { Telegraf, Markup } = require('telegraf');
-const fs = require('fs');
-const path = require('path');
+const { Telegraf } = require('telegraf');
+const bot = new Telegraf(process.env.BOT_TOKEN);
+const packageJson = require('./package.json');
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const OWNER_ID = process.env.OWNER_ID;
-const PORT = process.env.PORT || 3000;
-if (!BOT_TOKEN || !OWNER_ID) throw new Error('BOT_TOKEN and OWNER_ID must be set in .env');
-
-let prefix = ['.', '/'];
+// Global bot state
+const users = new Set();
+const startTime = Date.now();
 let botName = 'CYBIX V1';
 let bannerUrl = 'https://files.catbox.moe/7dozqn.jpg';
-let startTime = Date.now();
-let users = new Set();
-const usersFile = path.join(__dirname, 'users.json');
+let prefix = ['.', '/'];
 
-// Persistent users
-function saveUsers() { try { fs.writeFileSync(usersFile, JSON.stringify([...users])); } catch {} }
-function loadUsers() { if (fs.existsSync(usersFile)) { try { users = new Set(JSON.parse(fs.readFileSync(usersFile, 'utf8'))); } catch {} } }
-loadUsers();
+// Example buttons (customize as needed)
+const buttons = {
+  reply_markup: {
+    inline_keyboard: [
+      [{ text: "Repo", url: "https://github.com/Ash-Lynx1/CYBIX-V1" }],
+      [{ text: "Developer", url: "https://t.me/Ash_Lynx1" }]
+    ]
+  }
+};
 
-const buttons = Markup.inlineKeyboard([
-  [Markup.button.url('Telegram Channel', 'https://t.me/cybixtech')],
-  [Markup.button.url('WhatsApp Channel', 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X')]
-]);
+// Helper to add user to set
+function addUser(ctx) {
+  users.add(ctx.from.id);
+}
 
+// Helper to format uptime
 function uptimeStr(ms) {
   let s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   return `${h}h ${m}m ${sec}s`;
 }
 
+// Menu caption generator (customize as needed)
 function menuCaption(ctx) {
-  const user = ctx.from || {};
-  const memory = `${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`;
-  const speed = `${Math.floor(Math.random() * 100)}ms`;
-  const plugins = fs.existsSync('./plugins') && fs.readdirSync('./plugins').reduce((acc, folder) => {
-    const folderPath = path.join('./plugins', folder);
-    if (fs.lstatSync(folderPath).isDirectory()) {
-      acc += fs.readdirSync(folderPath).filter(f => f.endsWith('.js')).length;
-    }
-    return acc;
-  }, 0);
-  const now = new Date();
+  // You can split this into sections if desired
   return `
-╭━───〔 ${botName} 〕───━━╮
+╭━───〔 CYBIX V1 〕───━━╮
 │ ✦ ᴘʀᴇғɪx : ${prefix.join(', ')}
-│ ✦ ᴏᴡɴᴇʀ : ${OWNER_ID}
-│ ✦ ᴜsᴇʀ : ${user.first_name || ''}
-│ ✦ ᴜsᴇʀ ɪᴅ : ${user.id || ''}
+│ ✦ ᴏᴡɴᴇʀ : ${process.env.OWNER_ID || ctx.from.id}
+│ ✦ ᴜsᴇʀ : ${ctx.from.username || 'CYBIX DEV'}
+│ ✦ ᴜsᴇʀ ɪᴅ : ${ctx.from.id}
 │ ✦ ᴜsᴇʀs : ${users.size}
-│ ✦ sᴘᴇᴇᴅ : ${speed}
+│ ✦ sᴘᴇᴇᴅ : ${Date.now() - ctx.message.date * 1000}ms
 │ ✦ sᴛᴀᴛᴜs : Online
-│ ✦ ᴘʟᴜɢɪɴs : ${plugins}
-│ ✦ ᴠᴇʀsɪᴏɴ : 1.0.0
-│ ✦ ᴛɪᴍᴇ ɴᴏᴡ : ${now.toLocaleTimeString()}
-│ ✦ ᴅᴀᴛᴇ ɴᴏᴡ : ${now.toLocaleDateString()}
-│ ✦ ᴍᴇᴍᴏʀʏ : ${memory}
+│ ✦ ᴘʟᴜɢɪɴs : 51
+│ ✦ ᴠᴇʀsɪᴏɴ : ${packageJson.version}
+│ ✦ ᴛɪᴍᴇ ɴᴏᴡ : ${new Date().toLocaleTimeString()}
+│ ✦ ᴅᴀᴛᴇ ɴᴏᴡ : ${new Date().toLocaleDateString()}
+│ ✦ ᴍᴇᴍᴏʀʏ : ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB
 │ ✦ ʀᴜɴᴛɪᴍᴇ : ${uptimeStr(Date.now() - startTime)}
 ╰───────────────────╯
+
 ╭━━【 𝐀𝐈 𝐌𝐄𝐍𝐔 】━━
 ┃ • ᴄʜᴀᴛɢᴘᴛ
 ┃ • ᴏᴘᴇɴᴀɪ
@@ -66,6 +58,7 @@ function menuCaption(ctx) {
 ┃ • ᴅᴇᴇᴘsᴇᴋ
 ┃ • ᴛᴇxᴛ2ɪᴍɢ
 ╰━━━━━━━━━━━━━━━
+
 ╭━━【 𝐅𝐔𝐍 𝐌𝐄𝐍𝐔 】━━
 ┃ • ᴊᴏᴋᴇ
 ┃ • ᴍᴇᴍᴇ
@@ -73,6 +66,7 @@ function menuCaption(ctx) {
 ┃ • ᴅᴀʀᴇ
 ┃ • ᴛʀᴜᴛʜ
 ╰━━━━━━━━━━━━━━━
+
 ╭━━【 𝐓𝐎𝐎𝐋𝐒 𝐌𝐄𝐍𝐔 】━━
 ┃ • ᴏʙғᴜsᴄᴀᴛᴏʀ
 ┃ • ᴄᴀʟᴄ
@@ -81,6 +75,7 @@ function menuCaption(ctx) {
 ┃ • ᴛᴇᴍᴘᴍᴀɪʟ
 ┃ • ғᴀɴᴄʏ
 ╰━━━━━━━━━━━━━━━
+
 ╭━━【 𝐒𝐄𝐀𝐑𝐂𝐇 𝐌𝐄𝐍𝐔 】━━
 ┃ • ʟʏʀɪᴄs
 ┃ • sᴘᴏᴛɪғʏ-s
@@ -89,6 +84,7 @@ function menuCaption(ctx) {
 ┃ • ᴡᴇᴀᴛʜᴇʀ
 ┃ • ɢᴏᴏɢʟᴇ
 ╰━━━━━━━━━━━━━━━
+
 ╭━━【 𝐃𝐋 𝐌𝐄𝐍𝐔 】━━
 ┃ • ᴀᴘᴋ
 ┃ • sᴘᴏᴛɪғʏ
@@ -97,8 +93,9 @@ function menuCaption(ctx) {
 ┃ • ᴘʟᴀʏ
 ┃ • ʏᴛᴍᴘ4
 ┃ • ɢᴅʀɪᴠᴇ
-┃ • ᴅᴏᴄᴅʟ 
+┃ • ᴅᴏᴄᴅʟ
 ╰━━━━━━━━━━━━━━━
+
 ╭━━【 𝐎𝐓𝐇𝐄𝐑 𝐌𝐄𝐍𝐔 】━━
 ┃ • ʀᴇᴘᴏ
 ┃ • ᴘɪɴɢ
@@ -106,138 +103,99 @@ function menuCaption(ctx) {
 ┃ • ᴅᴇᴠᴇʟᴏᴘᴇʀ
 ┃ • ʙᴜʏʙᴏᴛ
 ╰━━━━━━━━━━━━━━━
+
 ╭━━【 𝐀𝐃𝐔𝐋𝐓 𝐌𝐄𝐍𝐔 】━━
 ┃ • xᴠɪᴅᴇᴏsᴇᴀʀᴄʜ
 ┃ • xɴxxsᴇᴀʀᴄʜ
 ┃ • ᴅʟ-xɴxxᴠɪᴅ
-┃ • ᴅʟ-xᴠɪᴅᴇᴏ
+┃ • ᴅʟ-xᴠɪᴅᴇᴏᴠɪᴅᴇᴏ
 ┃ • ʙᴏᴏʙs
 ┃ • ᴀss
 ┃ • ɴᴜᴅᴇs
 ╰━━━━━━━━━━━━━━━
-╭━━【𝐃𝐄𝐕 𝐌𝐄𝐍𝐔】━━
+
+╭━━【 𝐃𝐄𝐕 𝐌𝐄𝐍𝐔 】━━
 ┃ • sᴛᴀᴛɪᴄs
 ┃ • ʟɪsᴛᴜsᴇʀs
 ┃ • ᴍᴏᴅᴇ
-┃ • ʟɪsᴛᴜsᴇʀs
 ┃ • ʟᴏɢs
 ┃ • ɪɴғᴏ
 ┃ • sᴇᴛʙᴀɴɴᴇʀ
 ┃ • sᴇᴛᴘʀᴇғɪx
 ┃ • sᴇᴛʙᴏᴛɴᴀᴍᴇ
 ╰━━━━━━━━━━━━━━━
-
-ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝐂𝐘𝐁𝐈𝐗 𝐃𝐄𝐕𝐒
 `;
 }
 
+// Revised sendBanner: sends banner image (short caption), then full menu
 function sendBanner(ctx, caption) {
-  return ctx.replyWithPhoto({ url: bannerUrl }, {
-    caption,
+  // Send banner image with a short caption
+  ctx.replyWithPhoto({ url: bannerUrl }, {
+    caption: botName,
     ...buttons,
     parse_mode: 'Markdown'
   });
+  // Then send the full menu as a text message
+  ctx.reply(caption, { parse_mode: 'Markdown', ...buttons });
 }
 
-function isCmd(text) { return prefix.some((p) => text.startsWith(p)); }
-function getCmd(text) { return isCmd(text) ? text.slice(prefix.find(p => text.startsWith(p)).length).split(' ')[0].toLowerCase() : null; }
-function isOwner(ctx) { return `${ctx.from.id}` === OWNER_ID; }
-
-const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 99999 });
-
-function addUser(ctx) {
-  if (ctx.from && ctx.from.id) {
-    users.add(ctx.from.id);
-    saveUsers();
-  }
-}
-
-// Dev commands
-bot.command('statics', ctx => {
-  addUser(ctx);
-  let mem = `${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`;
-  let up = uptimeStr(Date.now() - startTime);
-  sendBanner(ctx, `Statics:\nVersion: 1.0.0\nMemory: ${mem}\nUptime: ${up}\nUsers: ${users.size}`);
-});
-bot.command('listusers', ctx => {
-  addUser(ctx);
-  sendBanner(ctx, `User IDs:\n${[...users].join('\n') || 'No users yet.'}`);
-});
-bot.command('mode', ctx => { addUser(ctx); sendBanner(ctx, 'Mode: Production'); });
-bot.command('logs', ctx => { addUser(ctx); sendBanner(ctx, 'Logs: Feature not implemented.'); });
-bot.command('info', ctx => { addUser(ctx); sendBanner(ctx, `Bot Name: ${botName}\nOwner: ${OWNER_ID}\nPrefix: ${prefix.join(', ')}\nVersion: 1.0.0`); });
-bot.command('setbanner', ctx => {
-  addUser(ctx);
-  if (!isOwner(ctx)) return sendBanner(ctx, 'Owner only command.');
-  let url = ctx.message.text.split(' ').slice(1).join(' ');
-  if (!url) return sendBanner(ctx, 'Usage: /setbanner <image_url>');
-  bannerUrl = url;
-  sendBanner(ctx, `Banner changed to: ${bannerUrl}`);
-});
-bot.command(['setprefix', 'setPrefix'], ctx => {
-  addUser(ctx);
-  if (!isOwner(ctx)) return sendBanner(ctx, 'Owner only command.');
-  const args = ctx.message.text.split(' ').slice(1);
-  if (!args.length) return sendBanner(ctx, 'Usage: /setprefix <newPrefix> [<morePrefixes>]');
-  prefix = args;
-  sendBanner(ctx, `Prefix changed to: ${prefix.join(', ')}`);
-});
-bot.command('setbotname', ctx => {
-  addUser(ctx);
-  if (!isOwner(ctx)) return sendBanner(ctx, 'Owner only command.');
-  let name = ctx.message.text.split(' ').slice(1).join(' ');
-  if (!name) return sendBanner(ctx, 'Usage: /setbotname <newName>');
-  botName = name;
-  sendBanner(ctx, `Bot name changed to: ${botName}`);
-});
-
-// Menu (all variants, always sends full menu as photo+caption+buttons)
+// Menu triggers: you can expand or customize these
 const menuTriggers = [
-  'menu', 'start', 'bot', 'help',
-  '.menu', '.start', '.bot', '.help',
-  '/menu', '/start', '/bot', '/help'
+  /^([./]|)(menu|help|start)$/i,
+  /^([./]|)(cybix)$/i
 ];
-for (const trigger of menuTriggers) {
-  bot.hears(trigger, ctx => { addUser(ctx); sendBanner(ctx, menuCaption(ctx)); });
-  bot.command(trigger.replace(/^[./]/, ''), ctx => { addUser(ctx); sendBanner(ctx, menuCaption(ctx)); });
-}
 
-// Plugins handler
-bot.on('text', async ctx => {
-  addUser(ctx);
-  const text = ctx.message.text;
-  if (!isCmd(text)) return;
-  const cmd = getCmd(text);
-  let handled = false;
-  const pluginsDir = path.join(__dirname, 'plugins');
-  if (fs.existsSync(pluginsDir)) {
-    for (const folder of fs.readdirSync(pluginsDir)) {
-      const folderPath = path.join(pluginsDir, folder);
-      if (fs.lstatSync(folderPath).isDirectory()) {
-        for (const file of fs.readdirSync(folderPath)) {
-          if (file.endsWith('.js')) {
-            const plugin = require(path.join(folderPath, file));
-            if (plugin && plugin.command === cmd && typeof plugin.handler === 'function') {
-              await plugin.handler(ctx, sendBanner);
-              handled = true;
-              break;
-            }
-          }
+// Register menu triggers
+menuTriggers.forEach(trigger => {
+  bot.hears(trigger, ctx => {
+    addUser(ctx);
+    sendBanner(ctx, menuCaption(ctx));
+  });
+  bot.command(trigger.toString().replace(/^[./]/, ''), ctx => {
+    addUser(ctx);
+    sendBanner(ctx, menuCaption(ctx));
+  });
+});
+
+// Plugin loader (simple, loads all plugins in plugins/*Menu/*)
+const fs = require('fs');
+const path = require('path');
+function loadPlugins() {
+  const pluginDirs = fs.readdirSync(path.join(__dirname, 'plugins')).filter(f => f.endsWith('Menu'));
+  for (const dir of pluginDirs) {
+    const fullDir = path.join(__dirname, 'plugins', dir);
+    fs.readdirSync(fullDir).forEach(file => {
+      if (file.endsWith('.js')) {
+        const plugin = require(path.join(fullDir, file));
+        if (plugin.command && plugin.handler) {
+          bot.command(plugin.command, async ctx => {
+            addUser(ctx);
+            await plugin.handler(ctx, sendBanner);
+          });
+          bot.hears(new RegExp(`^([./]|)${plugin.command}(\\s|$)`, 'i'), async ctx => {
+            addUser(ctx);
+            await plugin.handler(ctx, sendBanner);
+          });
         }
       }
-      if (handled) break;
-    }
+    });
   }
-  if (!handled) await sendBanner(ctx, `Unknown command: ${cmd}\nUse .menu to see available commands.`);
-});
+}
 
-bot.catch((err, ctx) => {
-  sendBanner(ctx, 'An internal error occurred. Try again later.');
-  console.error('Bot Error:', err);
-});
+// Load all plugins
+loadPlugins();
 
+// Start bot polling
 bot.launch();
 console.log('Bot running in polling mode (Render/Termux/Node.js)');
-if (process.env.RENDER) require('http').createServer((_, res) => res.end(`${botName} Bot Running`)).listen(PORT);
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+// Export for plugins
+module.exports = {
+  bot,
+  users,
+  startTime,
+  botName,
+  bannerUrl,
+  prefix,
+  buttons
+};
