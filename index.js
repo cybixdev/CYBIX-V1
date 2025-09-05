@@ -5,6 +5,7 @@ const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
+const OWNER_USERNAME = 'cybixdev'; // Fixed owner username
 
 if (!BOT_TOKEN || !OWNER_ID) {
   throw new Error('BOT_TOKEN and OWNER_ID must be set in .env');
@@ -17,12 +18,15 @@ const TG_CHANNEL = 'https://t.me/cybixtech';
 const WA_CHANNEL = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
 
 const channelButtons = Markup.inlineKeyboard([
-  [Markup.button.url('Telegram Channel', TG_CHANNEL), Markup.button.url('WhatsApp Channel', WA_CHANNEL)]
+  [Markup.button.url('Telegram Channel', TG_CHANNEL)],
+  [Markup.button.url('WhatsApp Channel', WA_CHANNEL)]
 ]);
 
 let PREFIXES = ['.', '/'];
 
+// Plugin loader (ready for plugin files)
 const plugins = {};
+
 function loadPlugins() {
   const pluginsPath = path.join(__dirname, 'plugins');
   if (!fs.existsSync(pluginsPath)) return;
@@ -47,12 +51,14 @@ loadPlugins();
 function isCmd(text) {
   return PREFIXES.some(prefix => text.startsWith(prefix));
 }
+
 function getCmd(text) {
   for (const prefix of PREFIXES) {
     if (text.startsWith(prefix)) return text.slice(prefix.length).split(' ')[0].toLowerCase();
   }
   return null;
 }
+
 function getArgs(text) {
   for (const prefix of PREFIXES) {
     if (text.startsWith(prefix)) return text.slice(prefix.length).split(' ').slice(1).join(' ');
@@ -60,11 +66,25 @@ function getArgs(text) {
   return '';
 }
 
-function getMenuText(ctx) {
+// Get real Telegram user count
+async function getRealUserCount(ctx) {
+  try {
+    // Use message.chat.id to fetch chat members count
+    const chatId = ctx.chat?.id || ctx.message?.chat?.id;
+    if (!chatId) return 0;
+    return await ctx.getChatMembersCount();
+  } catch {
+    return 0;
+  }
+}
+
+// Menu text generator (async for real user count)
+async function getMenuText(ctx) {
   const user = ctx.from?.first_name || 'Unknown';
   const userId = ctx.from?.id || 'Unknown';
+  const users = await getRealUserCount(ctx);
   const stats = {
-    users: 999,
+    users: users || 1,
     speed: '0.1s',
     status: 'Online',
     version: 'v1.0.0',
@@ -76,7 +96,7 @@ function getMenuText(ctx) {
   return `
 ╭━───〔 𝐂𝐘𝐁𝐈𝐗 𝐕1 〕───━━╮
 │ ✦ ᴘʀᴇғɪx : ${PREFIXES.join(', ')}
-│ ✦ ᴏᴡɴᴇʀ : ${OWNER_ID}
+│ ✦ ᴏᴡɴᴇʀ : @${OWNER_USERNAME}
 │ ✦ ᴜsᴇʀ : ${user}
 │ ✦ ᴜsᴇʀ ɪᴅ : ${userId}
 │ ✦ ᴜsᴇʀs : ${stats.users}
@@ -161,38 +181,27 @@ function getMenuText(ctx) {
 `.trim();
 }
 
-async function sendBannerResponse(ctx, text) {
+// Sends banner, then menu, then buttons (top to bottom, not inline)
+async function sendMenu(ctx) {
   try {
-    await ctx.replyWithPhoto(
-      { url: BANNER_URL },
-      {
-        caption: text,
-        parse_mode: 'Markdown',
-        ...channelButtons
-      }
-    );
-  } catch (e) {
-    await ctx.reply(text, { ...channelButtons, parse_mode: 'Markdown' });
-  }
+    await ctx.replyWithPhoto({ url: BANNER_URL }, { caption: "𝐂𝐘𝐁𝐈𝐗 𝐕1 𝐁𝐀𝐍𝐍𝐄𝐑", parse_mode: 'Markdown' });
+  } catch (e) { /* ignore */ }
+  const menuText = await getMenuText(ctx);
+  await ctx.reply(menuText, { parse_mode: 'Markdown' });
+  await ctx.reply("Channels:", channelButtons);
 }
 
 // Menu triggers
-bot.start(async ctx => {
-  await sendBannerResponse(ctx, getMenuText(ctx));
-});
-bot.command('menu', async ctx => {
-  await sendBannerResponse(ctx, getMenuText(ctx));
-});
-bot.hears(/^\.menu$/, async ctx => {
-  await sendBannerResponse(ctx, getMenuText(ctx));
-});
+bot.start(async ctx => { await sendMenu(ctx); });
+bot.command('menu', async ctx => { await sendMenu(ctx); });
+bot.hears(/^\.menu$/, async ctx => { await sendMenu(ctx); });
 
 // Prefix change command: owner only
 bot.hears(new RegExp(`^(${PREFIXES.join('|')})setprefix\\s+(.+)$`, 'i'), async ctx => {
   if (String(ctx.from.id) !== OWNER_ID) return;
   const args = ctx.message.text.split(' ').slice(1);
   PREFIXES = args[0].split(',');
-  await sendBannerResponse(ctx, `✅ Prefix updated: ${PREFIXES.join(', ')}`);
+  await ctx.reply(`✅ Prefix updated: ${PREFIXES.join(', ')}`, { parse_mode: 'Markdown' });
 });
 
 // Plugin routing: responds to any plugin command
@@ -201,12 +210,12 @@ bot.on('text', async ctx => {
   if (!isCmd(text)) return;
   const cmd = getCmd(text);
   const args = getArgs(text);
-
+  
   if (plugins[cmd]) {
     try {
-      await plugins[cmd].handler(ctx, args, { sendBannerResponse });
+      await plugins[cmd].handler(ctx, args, { sendMenu });
     } catch (e) {
-      await sendBannerResponse(ctx, '❌ Error in plugin.');
+      await ctx.reply('❌ Error in plugin.');
     }
   }
 });
