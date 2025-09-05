@@ -5,13 +5,13 @@ const path = require('path');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
-const OWNER_USERNAME = 'cybixdev'; // Fixed owner username
+const OWNER_USERNAME = 'cybixdev'; // Owner username for display
 
 if (!BOT_TOKEN || !OWNER_ID) {
   throw new Error('BOT_TOKEN and OWNER_ID must be set in .env');
 }
 
-const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 90_000 });
+const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 90000 });
 
 const BANNER_URL = 'https://files.catbox.moe/7dozqn.jpg';
 const TG_CHANNEL = 'https://t.me/cybixtech';
@@ -24,9 +24,8 @@ const channelButtons = Markup.inlineKeyboard([
 
 let PREFIXES = ['.', '/'];
 
-// Plugin loader (ready for plugin files)
+// Plugin loader
 const plugins = {};
-
 function loadPlugins() {
   const pluginsPath = path.join(__dirname, 'plugins');
   if (!fs.existsSync(pluginsPath)) return;
@@ -51,14 +50,12 @@ loadPlugins();
 function isCmd(text) {
   return PREFIXES.some(prefix => text.startsWith(prefix));
 }
-
 function getCmd(text) {
   for (const prefix of PREFIXES) {
     if (text.startsWith(prefix)) return text.slice(prefix.length).split(' ')[0].toLowerCase();
   }
   return null;
 }
-
 function getArgs(text) {
   for (const prefix of PREFIXES) {
     if (text.startsWith(prefix)) return text.slice(prefix.length).split(' ').slice(1).join(' ');
@@ -66,31 +63,28 @@ function getArgs(text) {
   return '';
 }
 
-// Get real Telegram user count
 async function getRealUserCount(ctx) {
   try {
-    // Use message.chat.id to fetch chat members count
     const chatId = ctx.chat?.id || ctx.message?.chat?.id;
-    if (!chatId) return 0;
+    if (!chatId) return 1;
     return await ctx.getChatMembersCount();
   } catch {
-    return 0;
+    return 1;
   }
 }
 
-// Menu text generator (async for real user count)
 async function getMenuText(ctx) {
   const user = ctx.from?.first_name || 'Unknown';
   const userId = ctx.from?.id || 'Unknown';
   const users = await getRealUserCount(ctx);
   const stats = {
-    users: users || 1,
+    users: users,
     speed: '0.1s',
     status: 'Online',
     version: 'v1.0.0',
     timeNow: new Date().toLocaleTimeString(),
     dateNow: new Date().toLocaleDateString(),
-    memory: `${(process.memoryUsage().heapUsed/1024/1024).toFixed(2)} MB`,
+    memory: `${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`,
     plugins: Object.keys(plugins).length
   };
   return `
@@ -181,20 +175,30 @@ async function getMenuText(ctx) {
 `.trim();
 }
 
-// Sends banner, then menu, then buttons (top to bottom, not inline)
-async function sendMenu(ctx) {
-  try {
-    await ctx.replyWithPhoto({ url: BANNER_URL }, { caption: "𝐂𝐘𝐁𝐈𝐗 𝐕1 𝐁𝐀𝐍𝐍𝐄𝐑", parse_mode: 'Markdown' });
-  } catch (e) { /* ignore */ }
+// Sends banner, menu, and buttons as one message (mediaGroup for perfect layout)
+async function sendFullMenu(ctx) {
   const menuText = await getMenuText(ctx);
-  await ctx.reply(menuText, { parse_mode: 'Markdown' });
-  await ctx.reply("Channels:", channelButtons);
+
+  try {
+    await ctx.replyWithPhoto(
+      { url: BANNER_URL },
+      {
+        caption: menuText,
+        parse_mode: 'Markdown',
+        reply_markup: channelButtons.reply_markup
+      }
+    );
+  } catch (e) {
+    // fallback: send text and buttons separately
+    await ctx.reply(menuText, { parse_mode: 'Markdown' });
+    await ctx.reply("Channels:", channelButtons);
+  }
 }
 
 // Menu triggers
-bot.start(async ctx => { await sendMenu(ctx); });
-bot.command('menu', async ctx => { await sendMenu(ctx); });
-bot.hears(/^\.menu$/, async ctx => { await sendMenu(ctx); });
+bot.start(async ctx => { await sendFullMenu(ctx); });
+bot.command('menu', async ctx => { await sendFullMenu(ctx); });
+bot.hears(/^\.menu$/, async ctx => { await sendFullMenu(ctx); });
 
 // Prefix change command: owner only
 bot.hears(new RegExp(`^(${PREFIXES.join('|')})setprefix\\s+(.+)$`, 'i'), async ctx => {
@@ -210,10 +214,10 @@ bot.on('text', async ctx => {
   if (!isCmd(text)) return;
   const cmd = getCmd(text);
   const args = getArgs(text);
-  
+
   if (plugins[cmd]) {
     try {
-      await plugins[cmd].handler(ctx, args, { sendMenu });
+      await plugins[cmd].handler(ctx, args, { sendFullMenu });
     } catch (e) {
       await ctx.reply('❌ Error in plugin.');
     }
