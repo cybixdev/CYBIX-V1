@@ -64,8 +64,6 @@ function getArgs(text) {
 
 async function getRealUserCount(ctx) {
   try {
-    const chatId = ctx.chat?.id || ctx.message?.chat?.id;
-    if (!chatId) return 1;
     return await ctx.getChatMembersCount();
   } catch {
     return 1;
@@ -174,29 +172,23 @@ async function getMenuText(ctx) {
 `.trim();
 }
 
-// Send menu as one message: banner, menu text, and buttons all together
+// Send banner, menu, and buttons all as ONE message
 async function sendFullMenu(ctx) {
   const menuText = await getMenuText(ctx);
-  try {
-    await ctx.replyWithPhoto(
-      { url: BANNER_URL },
-      {
-        caption: menuText,
-        parse_mode: 'Markdown',
-        reply_markup: channelButtons.reply_markup
-      }
-    );
-  } catch (e) {
-    // fallback: send text and buttons separately
-    await ctx.reply(menuText, { parse_mode: 'Markdown' });
-    await ctx.reply("Channels:", channelButtons);
-  }
+  await ctx.replyWithPhoto(
+    { url: BANNER_URL },
+    {
+      caption: menuText,
+      parse_mode: 'Markdown',
+      reply_markup: channelButtons.reply_markup
+    }
+  );
 }
 
 // Menu triggers
-bot.start(async ctx => { await sendFullMenu(ctx); });
-bot.command('menu', async ctx => { await sendFullMenu(ctx); });
-bot.hears(/^\.menu$/, async ctx => { await sendFullMenu(ctx); });
+bot.start(sendFullMenu);
+bot.command('menu', sendFullMenu);
+bot.hears(/^\.menu$/, sendFullMenu);
 
 // Prefix change command: owner only
 bot.hears(new RegExp(`^(${PREFIXES.join('|')})setprefix\\s+(.+)$`, 'i'), async ctx => {
@@ -212,7 +204,6 @@ bot.on('text', async ctx => {
   if (!isCmd(text)) return;
   const cmd = getCmd(text);
   const args = getArgs(text);
-
   if (plugins[cmd]) {
     try {
       await plugins[cmd].handler(ctx, args, { sendFullMenu });
