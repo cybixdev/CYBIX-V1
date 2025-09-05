@@ -15,6 +15,7 @@ let startTime = Date.now();
 let users = new Set();
 const usersFile = path.join(__dirname, 'users.json');
 
+// Persistent users
 function saveUsers() { try { fs.writeFileSync(usersFile, JSON.stringify([...users])); } catch {} }
 function loadUsers() { if (fs.existsSync(usersFile)) { try { users = new Set(JSON.parse(fs.readFileSync(usersFile, 'utf8'))); } catch {} } }
 loadUsers();
@@ -190,11 +191,12 @@ bot.command('setbotname', ctx => {
   sendBanner(ctx, `Bot name changed to: ${botName}`);
 });
 
-// Menu
-['menu', 'start', 'bot'].forEach(cmd => {
+// Menu (always sends full menu as photo+caption+buttons as one message)
+const menuCommands = ['menu', 'start', 'bot'];
+for (const cmd of menuCommands) {
   bot.command(cmd, ctx => { addUser(ctx); sendBanner(ctx, menuCaption(ctx)); });
   bot.hears([`.${cmd}`, `/${cmd}`], ctx => { addUser(ctx); sendBanner(ctx, menuCaption(ctx)); });
-});
+}
 
 // Plugins handler
 bot.on('text', async ctx => {
