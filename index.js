@@ -13,9 +13,9 @@ let botName = 'CYBIX V1';
 let bannerUrl = 'https://files.catbox.moe/7dozqn.jpg';
 let startTime = Date.now();
 let users = new Set();
-
 const usersFile = path.join(__dirname, 'users.json');
-function saveUsers() { try { fs.writeFileSync(usersFile, JSON.stringify(Array.from(users))); } catch {} }
+
+function saveUsers() { try { fs.writeFileSync(usersFile, JSON.stringify([...users])); } catch {} }
 function loadUsers() { if (fs.existsSync(usersFile)) { try { users = new Set(JSON.parse(fs.readFileSync(usersFile, 'utf8'))); } catch {} } }
 loadUsers();
 
@@ -138,12 +138,8 @@ function sendBanner(ctx, caption) {
   });
 }
 
-function isCmd(text) {
-  return prefix.some((p) => text.startsWith(p));
-}
-function getCmd(text) {
-  return isCmd(text) ? text.slice(prefix.find(p => text.startsWith(p)).length).split(' ')[0].toLowerCase() : null;
-}
+function isCmd(text) { return prefix.some((p) => text.startsWith(p)); }
+function getCmd(text) { return isCmd(text) ? text.slice(prefix.find(p => text.startsWith(p)).length).split(' ')[0].toLowerCase() : null; }
 function isOwner(ctx) { return `${ctx.from.id}` === OWNER_ID; }
 
 const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 99999 });
@@ -155,6 +151,7 @@ function addUser(ctx) {
   }
 }
 
+// Dev commands
 bot.command('statics', ctx => {
   addUser(ctx);
   let mem = `${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`;
@@ -163,20 +160,11 @@ bot.command('statics', ctx => {
 });
 bot.command('listusers', ctx => {
   addUser(ctx);
-  sendBanner(ctx, `User IDs:\n${Array.from(users).join('\n') || 'No users yet.'}`);
+  sendBanner(ctx, `User IDs:\n${[...users].join('\n') || 'No users yet.'}`);
 });
-bot.command('mode', ctx => {
-  addUser(ctx);
-  sendBanner(ctx, 'Mode: Production');
-});
-bot.command('logs', ctx => {
-  addUser(ctx);
-  sendBanner(ctx, 'Logs: Feature not implemented.');
-});
-bot.command('info', ctx => {
-  addUser(ctx);
-  sendBanner(ctx, `Bot Name: ${botName}\nOwner: ${OWNER_ID}\nPrefix: ${prefix.join(', ')}\nVersion: 1.0.0`);
-});
+bot.command('mode', ctx => { addUser(ctx); sendBanner(ctx, 'Mode: Production'); });
+bot.command('logs', ctx => { addUser(ctx); sendBanner(ctx, 'Logs: Feature not implemented.'); });
+bot.command('info', ctx => { addUser(ctx); sendBanner(ctx, `Bot Name: ${botName}\nOwner: ${OWNER_ID}\nPrefix: ${prefix.join(', ')}\nVersion: 1.0.0`); });
 bot.command('setbanner', ctx => {
   addUser(ctx);
   if (!isOwner(ctx)) return sendBanner(ctx, 'Owner only command.');
@@ -202,17 +190,13 @@ bot.command('setbotname', ctx => {
   sendBanner(ctx, `Bot name changed to: ${botName}`);
 });
 
+// Menu
 ['menu', 'start', 'bot'].forEach(cmd => {
-  bot.command(cmd, ctx => {
-    addUser(ctx);
-    sendBanner(ctx, menuCaption(ctx));
-  });
-  bot.hears([`.${cmd}`, `/${cmd}`], ctx => {
-    addUser(ctx);
-    sendBanner(ctx, menuCaption(ctx));
-  });
+  bot.command(cmd, ctx => { addUser(ctx); sendBanner(ctx, menuCaption(ctx)); });
+  bot.hears([`.${cmd}`, `/${cmd}`], ctx => { addUser(ctx); sendBanner(ctx, menuCaption(ctx)); });
 });
 
+// Plugins handler
 bot.on('text', async ctx => {
   addUser(ctx);
   const text = ctx.message.text;
@@ -238,9 +222,7 @@ bot.on('text', async ctx => {
       if (handled) break;
     }
   }
-  if (!handled) {
-    await sendBanner(ctx, `Unknown command: ${cmd}\nUse .menu to see available commands.`);
-  }
+  if (!handled) await sendBanner(ctx, `Unknown command: ${cmd}\nUse .menu to see available commands.`);
 });
 
 bot.catch((err, ctx) => {
@@ -249,10 +231,7 @@ bot.catch((err, ctx) => {
 });
 
 bot.launch();
-console.log('Bot running in polling mode (Render/Termux/Any Node.js host)');
-
-if (process.env.RENDER) {
-  require('http').createServer((_, res) => res.end(`${botName} Bot Running`)).listen(PORT);
-}
+console.log('Bot running in polling mode (Render/Termux/Node.js)');
+if (process.env.RENDER) require('http').createServer((_, res) => res.end(`${botName} Bot Running`)).listen(PORT);
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
