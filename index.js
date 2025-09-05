@@ -191,11 +191,15 @@ bot.command('setbotname', ctx => {
   sendBanner(ctx, `Bot name changed to: ${botName}`);
 });
 
-// Menu (always sends full menu as photo+caption+buttons as one message)
-const menuCommands = ['menu', 'start', 'bot'];
-for (const cmd of menuCommands) {
-  bot.command(cmd, ctx => { addUser(ctx); sendBanner(ctx, menuCaption(ctx)); });
-  bot.hears([`.${cmd}`, `/${cmd}`], ctx => { addUser(ctx); sendBanner(ctx, menuCaption(ctx)); });
+// Menu (all variants, always sends full menu as photo+caption+buttons)
+const menuTriggers = [
+  'menu', 'start', 'bot', 'help',
+  '.menu', '.start', '.bot', '.help',
+  '/menu', '/start', '/bot', '/help'
+];
+for (const trigger of menuTriggers) {
+  bot.hears(trigger, ctx => { addUser(ctx); sendBanner(ctx, menuCaption(ctx)); });
+  bot.command(trigger.replace(/^[./]/, ''), ctx => { addUser(ctx); sendBanner(ctx, menuCaption(ctx)); });
 }
 
 // Plugins handler
