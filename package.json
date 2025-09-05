@@ -1,0 +1,23 @@
+{
+  "name": "cybix-v1",
+  "version": "1.0.0",
+  "description": "CYBIX V1 Telegram bot core using Telegraf, plugin-ready.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "telegraf",
+    "cybix",
+    "plugin"
+  ],
+  "author": "Ash-Lynx1",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "telegraf": "^4.14.1",
+    "axios": "^1.6.7"
+  }
+}
