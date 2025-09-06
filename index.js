@@ -1,7 +1,3 @@
-// CYBIX V1 - All-in-one Telegraf Telegram Bot, single index.js core, best practices, 100% error-free, crash-proof, warning-free, fully dynamic, for Render/Termux. 
-// Place .env in root with BOT_TOKEN and OWNER_ID set.
-
-// == Imports & Init ==
 require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const axios = require('axios');
@@ -9,22 +5,20 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-// == Config ==
+// Config
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
 const BOT_VERSION = '1.0.0';
-const BANNER_URL = 'https://files.catbox.moe/7dozqn.jpg';
+const BANNER_URL = 'https://files.catbox.moe/8l5mky.jpg';
 const TG_CHANNEL = 'https://t.me/cybixtech';
 const WA_CHANNEL = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
 let PREFIXES = ['.', '/'];
 
-// == Safety Checks ==
 if (!BOT_TOKEN || !OWNER_ID) throw new Error('Set BOT_TOKEN and OWNER_ID in .env');
 
-// == Bot ==
 const bot = new Telegraf(BOT_TOKEN);
 
-// == User DB (simple persistent) ==
+// User db
 const userDBPath = path.join(__dirname, 'users.json');
 let users = [];
 if (fs.existsSync(userDBPath)) {
@@ -38,7 +32,7 @@ function registerUser(ctx) {
   }
 }
 
-// == Banner Reply Helper ==
+// Banner reply
 const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('📢 Telegram Channel', TG_CHANNEL)],
   [Markup.button.url('🟢 WhatsApp Channel', WA_CHANNEL)]
@@ -55,7 +49,7 @@ async function sendBanner(ctx, text, extra = {}) {
   }
 }
 
-// == Menu Helper ==
+// Menu
 function getMenu(ctx) {
   const now = new Date();
   let uname = ctx.from?.username || ctx.from?.first_name || "Unknown";
@@ -112,7 +106,7 @@ function getMenu(ctx) {
 `.trim();
 }
 
-// == Command Parser ==
+// Command parser
 function parseCommand(text) {
   for (const prefix of PREFIXES) {
     if (text.startsWith(prefix)) {
@@ -123,7 +117,7 @@ function parseCommand(text) {
   return null;
 }
 
-// == Prefix Setter (owner only) ==
+// Prefix setter
 bot.hears(/^([./])setprefix\s+(.+)/i, async (ctx) => {
   if (ctx.from.id.toString() !== OWNER_ID) return;
   let newPrefixes = ctx.match[2].split(/\s+/).filter(Boolean);
@@ -132,22 +126,49 @@ bot.hears(/^([./])setprefix\s+(.+)/i, async (ctx) => {
   await sendBanner(ctx, `✅ Prefix changed to: ${PREFIXES.join(' ')}`);
 });
 
-// == Menu/Start triggers ==
-for (const regex of [/^\/menu/i, /^\.menu/i, /^\/start/i, /^\.start/i, /^\/bot/i]) {
+// Menu/start triggers
+const menuRegexes = [/^\/menu/i, /^\.menu/i, /^\/start/i, /^\.start/i, /^\/bot/i];
+for (const regex of menuRegexes) {
   bot.hears(regex, async (ctx) => {
     registerUser(ctx);
     await sendBanner(ctx, getMenu(ctx));
   });
 }
 
-// == Plugin Handler (all in this file, long and detailed) ==
+// Robust API response field parser
+function getApiText(data) {
+  // Try to find the first string result, else JSON.stringify
+  if (!data) return "";
+  if (typeof data === "string") return data;
+  if (typeof data.result === "string") return data.result;
+  if (typeof data.answer === "string") return data.answer;
+  if (typeof data.text === "string") return data.text;
+  if (Array.isArray(data.result) && typeof data.result[0] === "string") return data.result.join('\n');
+  if (Array.isArray(data.result) && typeof data.result[0] === "object") {
+    // Try to join result urls/titles if possible
+    return data.result.map(x => x.url || x.title || JSON.stringify(x)).join('\n');
+  }
+  if (typeof data.result === "object") {
+    // Try to flatten object
+    let txt = "";
+    for (const k in data.result) {
+      if (typeof data.result[k] === "string") txt += `${k}: ${data.result[k]}\n`;
+      else if (typeof data.result[k] === "object" && data.result[k].url) txt += `${k}: ${data.result[k].url}\n`;
+    }
+    if (txt) return txt.trim();
+  }
+  return JSON.stringify(data, null, 2);
+}
+
+// Plugin handler
 async function handleCommand(ctx, { cmd, args }) {
+  // All command names in lower case
   switch (cmd) {
     case 'ping':
       return await sendBanner(ctx, `🏓 Pong!\nSpeed: ${Date.now() - ctx.message.date * 1000}ms`);
 
     case 'repo':
-      return await sendBanner(ctx, `🔗 [GitHub Repo](https://github.com/Mydie414/CYBIX)\n\nPowered by CYBIX Devs.`);
+      return await sendBanner(ctx, `NOT AVAILABLE.`);
 
     case 'runtime':
       return await sendBanner(ctx,
@@ -162,59 +183,65 @@ async function handleCommand(ctx, { cmd, args }) {
     case 'listusers':
       return await sendBanner(ctx, '👥 Users:\n' + users.map(u => `${u.name} (${u.id})`).join('\n'));
 
-    case 'chatgpt': // Public API, no prompt example, just use API
+    case 'chatgpt':
       if (!args.length) return await sendBanner(ctx, 'Usage: .chatgpt <prompt>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/ai/gpt?apikey=prince&q=${encodeURIComponent(args.join(' '))}`);
-        let ans = (data.result || data.answer || data.text || JSON.stringify(data)).substring(0, 2048);
+        let ans = getApiText(data);
         return await sendBanner(ctx, `🤖 ChatGPT:\n${ans}`);
-      } catch { return await sendBanner(ctx, '❌ ChatGPT API error.'); }
+      } catch (e) {
+        return await sendBanner(ctx, `❌ ChatGPT API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'gemini':
       if (!args.length) return await sendBanner(ctx, 'Usage: .gemini <prompt>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/ai/geminiaipro?apikey=prince&q=${encodeURIComponent(args.join(' '))}`);
-        let ans = data.result || data.answer || data.text || JSON.stringify(data);
+        let ans = getApiText(data);
         return await sendBanner(ctx, `🌈 Gemini:\n${ans}`);
-      } catch { return await sendBanner(ctx, '❌ Gemini API error.'); }
+      } catch (e) {
+        return await sendBanner(ctx, `❌ Gemini API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'deepseek':
       if (!args.length) return await sendBanner(ctx, 'Usage: .deepseek <prompt>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/ai/deepseek-v3?apikey=prince&q=${encodeURIComponent(args.join(' '))}`);
-        let ans = data.result || data.answer || data.text || JSON.stringify(data);
+        let ans = getApiText(data);
         return await sendBanner(ctx, `💡 Deepseek:\n${ans}`);
-      } catch { return await sendBanner(ctx, '❌ Deepseek API error.'); }
+      } catch (e) {
+        return await sendBanner(ctx, `❌ Deepseek API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'apk':
       if (!args.length) return await sendBanner(ctx, 'Usage: .apk <app name>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/download/apkdl?apikey=prince&appName=${encodeURIComponent(args.join(' '))}`);
-        if (data.result && data.result.downloadUrl) {
-          return await sendBanner(ctx, `📦 APK:\nApp: ${data.result.name}\n[Download](${data.result.downloadUrl})`);
-        }
-        return await sendBanner(ctx, '❌ APK not found.');
-      } catch { return await sendBanner(ctx, '❌ APK API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `📦 APK:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ APK API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'spotify':
       if (!args.length) return await sendBanner(ctx, 'Usage: .spotify <url>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/download/spotifydlv2?apikey=prince&url=${encodeURIComponent(args[0])}`);
-        if (data.result && data.result.url) {
-          return await sendBanner(ctx, `🎵 Spotify:\n[Download](${data.result.url})\nTitle: ${data.result.title}`);
-        }
-        return await sendBanner(ctx, '❌ Spotify track not found.');
-      } catch { return await sendBanner(ctx, '❌ Spotify API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🎵 Spotify:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ Spotify API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'gitclone':
       if (!args.length) return await sendBanner(ctx, 'Usage: .gitclone <github url>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/download/gitclone?apikey=prince&url=${encodeURIComponent(args[0])}`);
-        if (data.result && data.result.zipUrl) {
-          return await sendBanner(ctx, `🗃 GitClone:\n[Download ZIP](${data.result.zipUrl})`);
-        }
-        return await sendBanner(ctx, '❌ Repo not found.');
-      } catch { return await sendBanner(ctx, '❌ GitClone API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🗃 GitClone:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ GitClone API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'play':
       if (!args.length) return await sendBanner(ctx, 'Usage: .play <youtube url>');
@@ -225,34 +252,41 @@ async function handleCommand(ctx, { cmd, args }) {
           await ctx.replyWithAudio({ url: data.result.audio }, { title: data.result.title, ...channelButtons });
           return true;
         }
-        return await sendBanner(ctx, '❌ Audio not found.');
-      } catch { return await sendBanner(ctx, '❌ Play API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🎶 Play:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ Play API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'gdrive':
       if (!args.length) return await sendBanner(ctx, 'Usage: .gdrive <gdrive url>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/download/gdrivedl?apikey=prince&url=${encodeURIComponent(args[0])}`);
-        if (data.result && data.result.downloadUrl) {
-          return await sendBanner(ctx, `🗂 Google Drive:\n[Download](${data.result.downloadUrl})`);
-        }
-        return await sendBanner(ctx, '❌ GDrive file not found.');
-      } catch { return await sendBanner(ctx, '❌ GDrive API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🗂 Google Drive:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ GDrive API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'xvideosearch':
       if (!args.length) return await sendBanner(ctx, 'Usage: .xvideosearch <query>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/search/xvideossearch?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
-        let urls = (data.result || []).map(v => v.url).slice(0, 5).join('\n');
-        return await sendBanner(ctx, `🔞 Xvideos Search:\n${urls || 'No results.'}`);
-      } catch { return await sendBanner(ctx, '❌ Xvideos API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🔞 Xvideos Search:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ Xvideos API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'xnxxsearch':
       if (!args.length) return await sendBanner(ctx, 'Usage: .xnxxsearch <query>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/search/xnxxsearch?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
-        let urls = (data.result || []).map(v => v.url).slice(0, 5).join('\n');
-        return await sendBanner(ctx, `🔞 XNXX Search:\n${urls || 'No results.'}`);
-      } catch { return await sendBanner(ctx, '❌ XNXX API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🔞 XNXX Search:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ XNXX API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'dl-xnxxvid':
       if (!args.length) return await sendBanner(ctx, 'Usage: .dl-xnxxvid <xnxx url>');
@@ -262,8 +296,11 @@ async function handleCommand(ctx, { cmd, args }) {
           await ctx.replyWithVideo({ url: data.result.url }, { ...channelButtons });
           return true;
         }
-        return await sendBanner(ctx, '❌ Video not found.');
-      } catch { return await sendBanner(ctx, '❌ XNXXDL API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🔞 DL-XNXX:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ XNXXDL API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'dl-xvideo':
       if (!args.length) return await sendBanner(ctx, 'Usage: .dl-xvideo <xvideos url>');
@@ -273,100 +310,100 @@ async function handleCommand(ctx, { cmd, args }) {
           await ctx.replyWithVideo({ url: data.result.url }, { ...channelButtons });
           return true;
         }
-        return await sendBanner(ctx, '❌ Video not found.');
-      } catch { return await sendBanner(ctx, '❌ XVideosDL API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🔞 DL-XVideo:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ XVideosDL API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'lyrics':
       if (!args.length) return await sendBanner(ctx, 'Usage: .lyrics <song>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/search/lyrics?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
-        let lyrics = data.result?.lyrics || data.result || data.lyrics || "";
-        if (!lyrics) return await sendBanner(ctx, '❌ Lyrics not found.');
-        return await sendBanner(ctx, `🎵 Lyrics:\n${lyrics.substring(0, 2048)}`);
-      } catch { return await sendBanner(ctx, '❌ Lyrics API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🎵 Lyrics:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ Lyrics API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'wallpaper':
       if (!args.length) return await sendBanner(ctx, 'Usage: .wallpaper <query>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/search/wallpaper?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
         let img = (data.result && data.result[0] && data.result[0].url) || "";
-        if (!img) return await sendBanner(ctx, '❌ Wallpaper not found.');
-        await ctx.replyWithPhoto({ url: img }, { caption: '🖼 Wallpaper', ...channelButtons });
-        return true;
-      } catch { return await sendBanner(ctx, '❌ Wallpaper API error.'); }
+        if (img) {
+          await ctx.replyWithPhoto({ url: img }, { caption: '🖼 Wallpaper', ...channelButtons });
+          return true;
+        }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🖼 Wallpaper:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ Wallpaper API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'weather':
       if (!args.length) return await sendBanner(ctx, 'Usage: .weather <location>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/search/weather?apikey=prince&location=${encodeURIComponent(args.join(' '))}`);
-        let weather = data.result || data.weather || JSON.stringify(data);
-        return await sendBanner(ctx, `🌦️ Weather:\n${weather}`);
-      } catch { return await sendBanner(ctx, '❌ Weather API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🌦️ Weather:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ Weather API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     case 'text2img':
       if (!args.length) return await sendBanner(ctx, 'Usage: .text2img <prompt>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/ai/text2img?apikey=prince&prompt=${encodeURIComponent(args.join(' '))}`);
         let img = (data.result && data.result.url) || "";
-        if (!img) return await sendBanner(ctx, '❌ Text2Img not found.');
-        await ctx.replyWithPhoto({ url: img }, { caption: '🎨 AI Image', ...channelButtons });
-        return true;
-      } catch { return await sendBanner(ctx, '❌ Text2Img API error.'); }
-    
+        if (img) {
+          await ctx.replyWithPhoto({ url: img }, { caption: '🎨 AI Image', ...channelButtons });
+          return true;
+        }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🎨 AI Image:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ Text2Img API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
+
     case 'yts':
       if (!args.length) return await sendBanner(ctx, 'Usage: .yts <query>');
       try {
         let { data } = await axios.get(`https://api.princetechn.com/api/search/yts?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
-        let res = (data.result || []).map(x => `${x.title}\n${x.url}`).slice(0, 3).join('\n\n');
-        return await sendBanner(ctx, `🎬 YTS Results:\n${res || 'No results.'}`);
-      } catch { return await sendBanner(ctx, '❌ YTS API error.'); }
-
-    // EXAMPLES FOR PUBLIC APIs 2025 (if the above fail, fallback to public APIs as requested)
-    case 'cat':
-      // https://cataas.com/cat
-      try {
-        await ctx.replyWithPhoto({ url: 'https://cataas.com/cat' }, { caption: '🐱 Cat', ...channelButtons });
-        return true;
-      } catch { return await sendBanner(ctx, '❌ Cat API error.'); }
-    case 'dog':
-      // https://dog.ceo/api/breeds/image/random
-      try {
-        let { data } = await axios.get('https://dog.ceo/api/breeds/image/random');
-        await ctx.replyWithPhoto({ url: data.message }, { caption: '🐶 Dog', ...channelButtons });
-        return true;
-      } catch { return await sendBanner(ctx, '❌ Dog API error.'); }
+        let ans = getApiText(data);
+        return await sendBanner(ctx, `🎬 YTS Results:\n${ans}`);
+      } catch (e) {
+        return await sendBanner(ctx, `❌ YTS API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
+      }
 
     default: return false;
   }
 }
 
-// == Main Message Handler ==
+// Main message handler: only respond if menu trigger or valid prefix+command!
 bot.on('text', async (ctx, next) => {
   try {
     registerUser(ctx);
+    // menu trigger handled by bot.hears above
+    // Only respond to valid prefix+command:
     const command = parseCommand(ctx.message.text);
     if (command) {
       let handled = await handleCommand(ctx, command);
       if (handled) return;
+      // unknown command, show menu
       await sendBanner(ctx, getMenu(ctx));
-      return;
     }
+    // else: do NOT reply!!
   } catch (_) {}
   await next();
 });
 
-// == Fallback (always banner) ==
-bot.on('message', async (ctx) => {
-  try {
-    registerUser(ctx);
-    await sendBanner(ctx, getMenu(ctx));
-  } catch (_) {}
-});
+// Fallback: do not respond to anything else (no menu, no spam)
 
-// == Keepalive HTTP Server for Render/Termux ==
+// Keepalive HTTP Server for Render/Termux
 require('http').createServer((_, res) => res.end('Bot is running')).listen(process.env.PORT || 3000);
 
-// == Start ==
+// Start
 bot.launch()
   .then(() => console.log('CYBIX BOT started.'))
   .catch(err => { console.error('Failed to start bot:', err); process.exit(1); });
