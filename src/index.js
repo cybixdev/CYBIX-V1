@@ -3,23 +3,16 @@ const { Telegraf } = require('telegraf');
 const { useMultiFileAuthState, fetchLatestBaileysVersion, makeWASocket, DisconnectReason } = require('@whiskeysockets/baileys');
 const fs = require('fs-extra');
 const path = require('path');
-const os = require('os');
 const prettyMs = require('pretty-ms');
 
-const telegram = new Telegraf(process.env.BOT_TOKEN);
-const OWNER_ID = process.env.OWNER_ID;
-const SESSION_PATH = process.env.SESSION_PATH || './sessions';
+// ======== CONFIG =========
 const BOT_VERSION = '1.0.0';
 const PREFIX = '.';
+const OWNER_ID = process.env.OWNER_ID;
+const SESSION_PATH = process.env.SESSION_PATH || './sessions';
+const BANNER_URL = 'https://files.catbox.moe/yxrg76.jpg'; // <== PUT YOUR URL HERE
 
-const waUsers = new Map();
-
-function getBannerBuffer() {
-  const bannerPath = path.resolve(__dirname, 'assets/banner.jpg');
-  if (fs.existsSync(bannerPath)) return fs.readFileSync(bannerPath);
-  return null;
-}
-
+// ======= SYSTEM HELPERS =======
 function getUptime() {
   return prettyMs(process.uptime() * 1000);
 }
@@ -33,22 +26,24 @@ function getNowTime() {
 function getNowDate() {
   return new Date().toLocaleDateString('en-US');
 }
-
 function getAllPluginCount() {
-  const pluginsPath = path.join(__dirname, 'plugins');
-  let count = 0;
-  function walk(dir) {
-    fs.readdirSync(dir).forEach(f => {
-      const abs = path.join(dir, f);
-      if (fs.statSync(abs).isDirectory()) walk(abs);
-      else if (abs.endsWith('.js')) count++;
-    });
+  try {
+    const pluginsPath = path.join(__dirname, 'plugins');
+    let count = 0;
+    const walk = (dir) => {
+      fs.readdirSync(dir).forEach(f => {
+        const abs = path.join(dir, f);
+        if (fs.statSync(abs).isDirectory()) walk(abs);
+        else if (abs.endsWith('.js')) count++;
+      });
+    };
+    walk(pluginsPath);
+    return count;
+  } catch {
+    return 0;
   }
-  walk(pluginsPath);
-  return count;
 }
-
-async function buildMenu(user, speed) {
+function menuText(user, speed) {
   return `
 ╭━───〔 𝐂𝐘𝐁𝐈𝐗 𝐕1 〕───━━╮
 │ ✦ ᴘʀᴇғɪx : .
@@ -65,7 +60,10 @@ async function buildMenu(user, speed) {
 ╭━━【 𝐀𝐈 𝐌𝐄𝐍𝐔 】━━
 ┃ • .chatgpt <q>
 ┃ • .openai <q>
-┃ • .blackbox <code>
+┃ • .blackbox <q>
+┃ • .gemini <q>
+┃ • .deepseek <q>
+┃ • .text2img <prompt>
 ╰━━━━━━━━━━━━━━━
 ╭━━【 𝐅𝐔𝐍 𝐌𝐄𝐍𝐔 】━━
 ┃ • .joke
@@ -95,7 +93,7 @@ async function buildMenu(user, speed) {
 ┃ • .spotify <link>
 ┃ • .gitclone <repo>
 ┃ • .mediafire <url>
-┃ • .play <song>
+┃ • .play <url>
 ┃ • .ytmp4 <url>
 ┃ • .gdrive <link>
 ┃ • .docdl <url>
@@ -110,14 +108,13 @@ async function buildMenu(user, speed) {
 ╭━━【 𝐀𝐃𝐔𝐋𝐓 𝐌𝐄𝐍𝐔 】━━
 ┃ • .xvideosearch <q>
 ┃ • .xnxxsearch <q>
-┃ • .dl-xnxxvid <url>
+┃ • .dl-xnxx <url>
 ┃ • .dl-xvideo <url>
 ╰━━━━━━━━━━━━━━━
 
 ᴘᴏᴡᴇʀᴇᴅ ʙʏ 𝐂𝐘𝐁𝐈𝐗 𝐃𝐄𝐕𝐒
 `.trim();
 }
-
 function telegramPairMenu() {
   return `
 ╭━━【 CYBIX PAIR 】━━
@@ -130,13 +127,14 @@ function telegramPairMenu() {
 `.trim();
 }
 
-// === Telegram Side ===
+// ====== SESSION MGR ======
+const waUsers = new Map();
+
+// ====== TELEGRAM LOGIC ======
+const telegram = new Telegraf(process.env.BOT_TOKEN);
+
 telegram.start(async ctx => {
-  if (getBannerBuffer()) {
-    await ctx.replyWithPhoto({ source: getBannerBuffer() }, { caption: telegramPairMenu() });
-  } else {
-    await ctx.reply(telegramPairMenu());
-  }
+  await ctx.replyWithPhoto({ url: BANNER_URL }, { caption: telegramPairMenu() });
 });
 telegram.command('help', ctx => ctx.reply('Use /pair <your_number> to pair WhatsApp. For support, use /owner.'));
 telegram.command('owner', ctx => ctx.reply('Owner: CYBIX DEVS'));
@@ -153,10 +151,9 @@ telegram.command('pair', async ctx => {
   const waNumber = parts[1].replace(/[^0-9]/g, '');
   ctx.reply('Generating WhatsApp pairing code...');
 
-  // === WhatsApp Pairing ===
+  // ==== WA PAIRING ====
   const sessionDir = path.join(SESSION_PATH, String(userId));
   await fs.ensureDir(sessionDir);
-
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
   const { version } = await fetchLatestBaileysVersion();
   const sock = makeWASocket({
@@ -168,23 +165,40 @@ telegram.command('pair', async ctx => {
 
   sock.ev.on('creds.update', saveCreds);
 
+  // WhatsApp notifications for pairing attempt
+  sock.ev.on('messages.upsert', async ({ messages }) => {
+    for (const msg of messages) {
+      // This will notify user on WhatsApp app when pairing is happening
+      if (
+        msg.key && msg.key.fromMe && msg.message &&
+        msg.message.deviceSentMessage
+      ) {
+        await ctx.replyWithPhoto({ url: BANNER_URL }, { caption: "WhatsApp device pairing notification received." });
+      }
+    }
+  });
+
   sock.ev.on('connection.update', async update => {
     if (update.pairingCode) {
       waUsers.set(userId, { sock, waNumber, sessionDir });
-      await ctx.replyWithMarkdown(`*Pairing code:* \`${update.pairingCode}\`\n\n1. Open WhatsApp\n2. Linked Devices > Link a Device\n3. Enter this code`);
+      await ctx.replyWithPhoto({ url: BANNER_URL }, {
+        caption:
+          `*Pairing code:* \`${update.pairingCode}\`\n\n1. Open WhatsApp\n2. Linked Devices > Link a Device\n3. Enter this code`
+      });
     }
     if (update.connection === 'open') {
-      await ctx.reply('✅ WhatsApp paired!');
+      await ctx.replyWithPhoto({ url: BANNER_URL }, { caption: '✅ WhatsApp paired!' });
     }
     if (update.connection === 'close') {
       if (update.lastDisconnect?.error?.output?.statusCode === DisconnectReason.loggedOut) {
         waUsers.delete(userId);
         await fs.remove(sessionDir);
-        await ctx.reply('❌ WhatsApp session ended.');
+        await ctx.replyWithPhoto({ url: BANNER_URL }, { caption: '❌ WhatsApp session ended.' });
       }
     }
   });
 
+  // WhatsApp command handler
   sock.ev.on('messages.upsert', async ({ messages }) => {
     for (const msg of messages) {
       if (!msg.message || !msg.key.remoteJid) continue;
@@ -197,11 +211,11 @@ telegram.command('pair', async ctx => {
       const pushName = msg.pushName || waNumber;
       const speed = '50ms';
 
-      // Try to load plugin
+      // Plugins (to be implemented after)
       let pluginFound = false;
-      // List of all plugin subfolders
       const pluginGroups = [
-        'aiMenu', 'funMenu', 'toolsMenu', 'searchMenu', 'dlMenu', 'otherMenu', 'adultMenu'
+        'aiMenu', 'funMenu', 'toolsMenu', 'searchMenu',
+        'dlMenu', 'otherMenu', 'adultMenu'
       ];
       for (const group of pluginGroups) {
         const pluginFile = path.join(__dirname, 'plugins', group, `${cmd}.js`);
@@ -209,40 +223,43 @@ telegram.command('pair', async ctx => {
           try {
             pluginFound = true;
             const plugin = require(pluginFile);
-            await plugin.run(sock, msg, argstr);
+            await plugin.run(sock, msg, argstr, () => BANNER_URL);
           } catch (e) {
-            await sock.sendMessage(from, { text: 'Error running command: ' + e.message });
+            await sock.sendMessage(from, { image: { url: BANNER_URL }, caption: 'Error running command: ' + e.message });
           }
           break;
         }
       }
       if (pluginFound) continue;
 
-      // Built-in commands
+      // Built-ins
       switch (cmd) {
         case 'ping':
-          await sock.sendMessage(from, { text: `Pong! Latency: ${speed}` });
+          await sock.sendMessage(from, { image: { url: BANNER_URL }, caption: `Pong! Latency: ${speed}` });
           break;
         case 'menu': {
-          if (getBannerBuffer()) {
-            await sock.sendMessage(from, { image: getBannerBuffer(), caption: await buildMenu(pushName, speed) });
-          } else {
-            await sock.sendMessage(from, { text: await buildMenu(pushName, speed) });
-          }
-          await sock.sendMessage(from, { text: "CYBIX TECH NEWSLETTER\n\n- Welcome to CYBIX V1! Stay tuned for updates.", contextInfo: { isForwarded: true } });
+          await sock.sendMessage(from, {
+            image: { url: BANNER_URL },
+            caption: menuText(pushName, speed)
+          });
+          await sock.sendMessage(from, {
+            image: { url: BANNER_URL },
+            caption: "CYBIX TECH NEWSLETTER\n\n- Welcome to CYBIX V1! Stay tuned for updates.",
+            contextInfo: { isForwarded: true }
+          });
           break;
         }
         case 'runtime':
-          await sock.sendMessage(from, { text: `Uptime: ${getUptime()}` });
+          await sock.sendMessage(from, { image: { url: BANNER_URL }, caption: `Uptime: ${getUptime()}` });
           break;
         case 'repo':
-          await sock.sendMessage(from, { text: 'https://github.com/JadenAfrix1' });
+          await sock.sendMessage(from, { image: { url: BANNER_URL }, caption: 'https://github.com/CYBIXDEVS/cybix-v1-bot' });
           break;
         case 'developer':
-          await sock.sendMessage(from, { text: 'CYBIX DEVS' });
+          await sock.sendMessage(from, { image: { url: BANNER_URL }, caption: 'CYBIX DEVS' });
           break;
         default:
-          await sock.sendMessage(from, { text: 'Unknown command. Type .menu' });
+          await sock.sendMessage(from, { image: { url: BANNER_URL }, caption: 'Unknown command. Type .menu' });
       }
     }
   });
