@@ -8,7 +8,7 @@ const os = require('os');
 // Config
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
-const BOT_VERSION = '1.0.4';
+const BOT_VERSION = '1.0.5';
 const BANNER_URL = 'https://files.catbox.moe/8l5mky.jpg';
 const TG_CHANNEL = 'https://t.me/cybixtech';
 const WA_CHANNEL = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
@@ -49,17 +49,10 @@ async function sendBanner(ctx, text, extra = {}) {
   }
 }
 
-// Menu (ORIGINAL STRUCTURE ONLY, just append new menus below)
 function getMenu(ctx) {
   const now = new Date();
   let uname = ctx.from?.username || ctx.from?.first_name || "Unknown";
   let uid = ctx.from?.id || "";
-  let pluginsList = [
-    "• chatgpt", "• gemini", "• deepseek", "• apk", "• spotify", "• gitclone", "• play", "• gdrive",
-    "• repo", "• ping", "• runtime", "• xvideosearch", "• xnxxsearch", "• dl-xnxxvid", "• dl-xvideo",
-    "• statics", "• listusers",
-    // Hentai/NSFW/Porn/Fun/Dev/Tools plugins will be listed in their own menus below
-  ];
   return `
 ╭━───〔 𝐂𝐘𝐁𝐈𝐗 𝐕1 〕───━━╮
 │ ✦ ᴘʀᴇғɪx : ${PREFIXES.join(' ')}
@@ -69,7 +62,7 @@ function getMenu(ctx) {
 │ ✦ ᴜsᴇʀs : ${users.length}
 │ ✦ sᴘᴇᴇᴅ : ${Date.now() - ctx.message.date * 1000}ms
 │ ✦ sᴛᴀᴛᴜs : Online
-│ ✦ ᴘʟᴜɢɪɴs : ${pluginsList.length + 24}
+│ ✦ ᴘʟᴜɢɪɴs : 44+
 │ ✦ ᴠᴇʀsɪᴏɴ : ${BOT_VERSION}
 │ ✦ ᴛɪᴍᴇ ɴᴏᴡ : ${now.toLocaleTimeString()}
 │ ✦ ᴅᴀᴛᴇ ɴᴏᴡ : ${now.toLocaleDateString()}
@@ -149,7 +142,7 @@ function getMenu(ctx) {
 ┃ • env
 ┃ • memory
 ╰━━━━━━━━━━━━━━━
-╭━━【𝐓𝐎𝐎𝐋𝐒 𝐌𝐄𝐍𝐔】━━
+╭━━【𝐓𝐎𝐎𝐥𝐒 𝐌𝐄𝐍𝐔】━━
 ┃ • qr
 ┃ • tts
 ┃ • translate
@@ -162,7 +155,6 @@ function getMenu(ctx) {
 `.trim();
 }
 
-// Command parser
 function parseCommand(text) {
   for (const prefix of PREFIXES) {
     if (text.startsWith(prefix)) {
@@ -173,7 +165,6 @@ function parseCommand(text) {
   return null;
 }
 
-// Prefix setter
 bot.hears(/^([./])setprefix\s+(.+)/i, async (ctx) => {
   if (ctx.from.id.toString() !== OWNER_ID) return;
   let newPrefixes = ctx.match[2].split(/\s+/).filter(Boolean);
@@ -182,7 +173,6 @@ bot.hears(/^([./])setprefix\s+(.+)/i, async (ctx) => {
   await sendBanner(ctx, `✅ Prefix changed to: ${PREFIXES.join(' ')}`);
 });
 
-// Menu/start triggers
 const menuRegexes = [/^\/menu/i, /^\.menu/i, /^\/start/i, /^\.start/i, /^\/bot/i];
 for (const regex of menuRegexes) {
   bot.hears(regex, async (ctx) => {
@@ -191,7 +181,6 @@ for (const regex of menuRegexes) {
   });
 }
 
-// Robust API response field parser
 function getApiText(data) {
   if (!data) return "";
   if (typeof data === "string") return data;
@@ -213,7 +202,6 @@ function getApiText(data) {
   return JSON.stringify(data, null, 2);
 }
 
-// Plugin handler - ALL commands, real endpoints only, original structure only
 async function handleCommand(ctx, { cmd, args }) {
   // Hentai/NSFW/Porn real public APIs
   const nekosBase = "https://nekos.life/api/v2/img";
@@ -249,17 +237,7 @@ async function handleCommand(ctx, { cmd, args }) {
   };
   try {
     switch (cmd) {
-      // AI & DL & Other Menu (original)
-      case 'ping':
-        return await sendBanner(ctx, `🏓 Pong!\nSpeed: ${Date.now() - ctx.message.date * 1000}ms`);
-      case 'repo':
-        return await sendBanner(ctx, `🔗 [GitHub Repo](https://github.com/Mydie414/CYBIX)\n\nPowered by CYBIX Devs.`);
-      case 'runtime':
-        return await sendBanner(ctx, `⏱ Runtime: ${((process.uptime() / 60) | 0)}m ${(process.uptime() % 60 | 0)}s\nMemory: ${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)} MB`);
-      case 'statics':
-        return await sendBanner(ctx, `📊 Static Info:\nTotal Users: ${users.length}\nVersion: ${BOT_VERSION}\nOnline: CYBIX`);
-      case 'listusers':
-        return await sendBanner(ctx, '👥 Users:\n' + users.map(u => `${u.name} (${u.id})`).join('\n'));
+      // AI Menu
       case 'chatgpt':
         if (!args.length) return await sendBanner(ctx, 'Usage: .chatgpt <prompt>');
         {
@@ -281,6 +259,8 @@ async function handleCommand(ctx, { cmd, args }) {
           let ans = getApiText(data);
           return await sendBanner(ctx, `💡 Deepseek:\n${ans}`);
         }
+
+      // DL Menu
       case 'apk':
         if (!args.length) return await sendBanner(ctx, 'Usage: .apk <app name>');
         {
@@ -321,6 +301,16 @@ async function handleCommand(ctx, { cmd, args }) {
           let ans = getApiText(data);
           return await sendBanner(ctx, `🗂 Google Drive:\n${ans}`);
         }
+
+      // Other menu
+      case 'repo':
+        return await sendBanner(ctx, `🔗 [GitHub Repo](https://github.com/Mydie414/CYBIX)\n\nPowered by CYBIX Devs.`);
+      case 'ping':
+        return await sendBanner(ctx, `🏓 Pong!\nSpeed: ${Date.now() - ctx.message.date * 1000}ms`);
+      case 'runtime':
+        return await sendBanner(ctx, `⏱ Runtime: ${((process.uptime() / 60) | 0)}m ${(process.uptime() % 60 | 0)}s\nMemory: ${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)} MB`);
+
+      // Adult menu
       case 'xvideosearch':
         if (!args.length) return await sendBanner(ctx, 'Usage: .xvideosearch <query>');
         {
@@ -357,7 +347,8 @@ async function handleCommand(ctx, { cmd, args }) {
           let ans = getApiText(data);
           return await sendBanner(ctx, `🔞 DL-XVideo:\n${ans}`);
         }
-      // Hentai menu
+
+      // Hentai/NSFW menu
       case 'hentai':
       case 'waifu':
       case 'blowjob':
@@ -379,7 +370,7 @@ async function handleCommand(ctx, { cmd, args }) {
       case 'thighs':
       case 'blowjob2': {
         let apiUrl = publicApi[cmd];
-        let { data } = await axios.get(apiUrl, { timeout: 10_000 });
+        let { data } = await axios.get(apiUrl, { timeout: 10000 });
         let img = data.url || data.message;
         if (img) {
           await ctx.replyWithPhoto({ url: img }, { caption: `🔞 ${cmd.toUpperCase()}`, ...channelButtons });
@@ -387,12 +378,13 @@ async function handleCommand(ctx, { cmd, args }) {
         }
         return await sendBanner(ctx, `No image found for ${cmd}.`);
       }
+
       // Porn menu
       case 'porngif':
       case 'pornpic':
       case 'randomporn': {
         let apiUrl = pornApi[cmd];
-        let { data } = await axios.get(apiUrl, { timeout: 10_000 });
+        let { data } = await axios.get(apiUrl, { timeout: 10000 });
         let img = data.url || data.message;
         if (img) {
           await ctx.replyWithPhoto({ url: img }, { caption: `🔞 ${cmd.toUpperCase()}`, ...channelButtons });
@@ -402,7 +394,7 @@ async function handleCommand(ctx, { cmd, args }) {
       }
       case 'pornsearch': {
         let query = args.join(' ') || "waifu";
-        let { data } = await axios.get(`${waifuPicsNSFW}/waifu`, { timeout: 10_000 });
+        let { data } = await axios.get(`${waifuPicsNSFW}/waifu`, { timeout: 10000 });
         let img = data.url;
         if (img) {
           await ctx.replyWithPhoto({ url: img }, { caption: `🔞 Search result for "${query}"`, ...channelButtons });
@@ -410,6 +402,7 @@ async function handleCommand(ctx, { cmd, args }) {
         }
         return await sendBanner(ctx, `No image found for ${query}.`);
       }
+
       // Fun menu
       case 'joke': {
         let { data } = await axios.get('https://v2.jokeapi.dev/joke/Any');
@@ -445,7 +438,12 @@ async function handleCommand(ctx, { cmd, args }) {
         let { data } = await axios.get('https://evilinsult.com/generate_insult.php?lang=en&type=json');
         return await sendBanner(ctx, `🔥 Roast:\n${data.insult}`);
       }
+
       // Dev menu
+      case 'statics':
+        return await sendBanner(ctx, `📊 Static Info:\nTotal Users: ${users.length}\nVersion: ${BOT_VERSION}\nOnline: CYBIX`);
+      case 'listusers':
+        return await sendBanner(ctx, '👥 Users:\n' + users.map(u => `${u.name} (${u.id})`).join('\n'));
       case 'stderror':
         return await sendBanner(ctx, `STDERR: ${(typeof process.stderr !== "undefined" ? "Available" : "Not available")}`);
       case 'osinfo':
@@ -460,6 +458,7 @@ async function handleCommand(ctx, { cmd, args }) {
         return await sendBanner(ctx, 'ENV:\n' + Object.entries(process.env).map(([k,v]) => `${k}=${v}`).join('\n'));
       case 'memory':
         return await sendBanner(ctx, `Memory Usage:\n${JSON.stringify(process.memoryUsage(), null, 2)}`);
+
       // Tools menu
       case 'qr': {
         if (!args.length) return await sendBanner(ctx, 'Usage: .qr <text>');
@@ -493,7 +492,8 @@ async function handleCommand(ctx, { cmd, args }) {
         let { data } = await axios.get(`https://api.api-ninjas.com/v1/whois?domain=${encodeURIComponent(args[0])}`, { headers: { 'X-Api-Key': 'PASTE_YOUR_API_KEY' } });
         return await sendBanner(ctx, `🔧 Whois:\n${getApiText(data)}`);
       }
-      // Lyrics, wallpaper, weather, text2img, yts (original, keep as is)
+
+      // Other original plugins
       case 'lyrics':
         if (!args.length) return await sendBanner(ctx, 'Usage: .lyrics <song>');
         {
@@ -546,13 +546,12 @@ async function handleCommand(ctx, { cmd, args }) {
   }
 }
 
-// Main message handler: only respond if menu trigger or valid prefix+command!
 bot.on('text', async (ctx, next) => {
   try {
     registerUser(ctx);
     const command = parseCommand(ctx.message.text);
     if (command) {
-      let handled = await handleCommand(ctx, command);
+      await handleCommand(ctx, command);
       return;
     }
   } catch (_) {}
