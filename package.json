@@ -1,6 +1,6 @@
 {
   "name": "cybix-bot",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "description": "Cybix Telegram Bot using Telegraf, All in one index.js, Render/Termux, error-free.",
   "main": "index.js",
   "type": "commonjs",

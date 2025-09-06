@@ -6,10 +6,10 @@ const os = require('os');
 const path = require('path');
 const tmp = require('tmp-promise');
 
-// Config
+// === CONFIG ===
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
-const BOT_VERSION = '2.0.0';
+const BOT_VERSION = '2.0.1';
 const BANNER_URL = 'https://files.catbox.moe/8l5mky.jpg';
 const TG_CHANNEL = 'https://t.me/cybixtech';
 const WA_CHANNEL = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
@@ -19,7 +19,7 @@ if (!BOT_TOKEN || !OWNER_ID) throw new Error('Set BOT_TOKEN and OWNER_ID in .env
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// User db
+// === USER DB ===
 const userDBPath = path.join(__dirname, 'users.json');
 let users = [];
 if (fs.existsSync(userDBPath)) {
@@ -33,7 +33,7 @@ function registerUser(ctx) {
   }
 }
 
-// Banner reply
+// === BANNER + CHANNELS ===
 const channelButtons = Markup.inlineKeyboard([
   [Markup.button.url('📢 Telegram Channel', TG_CHANNEL)],
   [Markup.button.url('🟢 WhatsApp Channel', WA_CHANNEL)]
@@ -50,19 +50,7 @@ async function sendBanner(ctx, text, extra = {}) {
   }
 }
 
-// Helper to download a file and return local path
-async function downloadFileFromUrl(url, ext = '') {
-  const { path: tmpPath, cleanup } = await tmp.file({ postfix: ext ? '.' + ext : '' });
-  const writer = fs.createWriteStream(tmpPath);
-  const response = await axios.get(url, { responseType: 'stream' });
-  await new Promise((resolve, reject) => {
-    response.data.pipe(writer);
-    writer.on('finish', resolve);
-    writer.on('error', reject);
-  });
-  return { tmpPath, cleanup };
-}
-
+// === MENU ===
 function getMenu(ctx) {
   const now = new Date();
   let uname = ctx.from?.username || ctx.from?.first_name || "Unknown";
@@ -217,7 +205,20 @@ function getApiText(data) {
   return JSON.stringify(data, null, 2);
 }
 
-// Main command handler
+// Helper to download a file and return local path
+async function downloadFileFromUrl(url, ext = '') {
+  const { path: tmpPath, cleanup } = await tmp.file({ postfix: ext ? '.' + ext : '' });
+  const writer = fs.createWriteStream(tmpPath);
+  const response = await axios.get(url, { responseType: 'stream' });
+  await new Promise((resolve, reject) => {
+    response.data.pipe(writer);
+    writer.on('finish', resolve);
+    writer.on('error', reject);
+  });
+  return { tmpPath, cleanup };
+}
+
+// === COMMAND HANDLER ===
 async function handleCommand(ctx, { cmd, args }) {
   try {
     // AI MENU
@@ -237,7 +238,7 @@ async function handleCommand(ctx, { cmd, args }) {
       return sendBanner(ctx, `💡 Deepseek:\n${getApiText(data)}`);
     }
 
-    // DL MENU
+    // DL MENU (SEND AS FILE)
     if (cmd === 'apk') {
       if (!args.length) return sendBanner(ctx, 'Usage: .apk <app name>');
       const { data } = await axios.get(`https://api.princetechn.com/api/download/apkdl?apikey=prince&appName=${encodeURIComponent(args.join(' '))}`);
@@ -300,7 +301,7 @@ async function handleCommand(ctx, { cmd, args }) {
       return;
     }
 
-    // Adult menu
+    // ADULT MENU
     if (cmd === 'xvideosearch') {
       if (!args.length) return sendBanner(ctx, 'Usage: .xvideosearch <query>');
       const { data } = await axios.get(`https://api.princetechn.com/api/search/xvideossearch?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
@@ -336,7 +337,7 @@ async function handleCommand(ctx, { cmd, args }) {
       return;
     }
 
-    // Hentai/NSFW menu (nekos.best endpoints)
+    // HENTAI/NSFW MENU - nekos.best endpoints
     const nekosBest = (endpoint) => `https://nekos.best/api/v2/${endpoint}`;
     const nsfwBestCmds = {
       hentai: 'hentai',
@@ -370,7 +371,7 @@ async function handleCommand(ctx, { cmd, args }) {
       return sendBanner(ctx, `No image found for ${cmd}.`);
     }
 
-    // Porn menu (using nekos.best as fallback)
+    // PORN MENU (using nekos.best as fallback)
     if (cmd === 'porngif') {
       const { data } = await axios.get(nekosBest('hentai_gif'));
       if (data.results && data.results.length > 0) {
@@ -402,7 +403,7 @@ async function handleCommand(ctx, { cmd, args }) {
       return sendBanner(ctx, `No result for tag: ${tag}`);
     }
 
-    // Fun menu
+    // FUN MENU
     if (cmd === 'joke') {
       const { data } = await axios.get('https://v2.jokeapi.dev/joke/Any');
       let joke = data.type === "single" ? data.joke : `${data.setup}\n${data.delivery}`;
@@ -437,7 +438,7 @@ async function handleCommand(ctx, { cmd, args }) {
       return sendBanner(ctx, `🔥 Roast:\n${data.insult}`);
     }
 
-    // Dev menu
+    // DEV MENU
     if (cmd === 'statics') {
       return sendBanner(ctx, `📊 Static Info:\nTotal Users: ${users.length}\nVersion: ${BOT_VERSION}\nOnline: CYBIX`);
     }
@@ -466,7 +467,7 @@ async function handleCommand(ctx, { cmd, args }) {
       return sendBanner(ctx, `Memory Usage:\n${JSON.stringify(process.memoryUsage(), null, 2)}`);
     }
 
-    // Tools menu
+    // TOOLS MENU
     if (cmd === 'qr') {
       if (!args.length) return sendBanner(ctx, 'Usage: .qr <text>');
       let url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(args.join(' '))}`;
@@ -500,7 +501,7 @@ async function handleCommand(ctx, { cmd, args }) {
       return sendBanner(ctx, `🔧 Whois:\n${getApiText(data)}`);
     }
 
-    // Lyrics, wallpaper, weather, text2img, yts (original)
+    // LYRICS, WALLPAPER, WEATHER, TEXT2IMG, YTS
     if (cmd === 'lyrics') {
       if (!args.length) return sendBanner(ctx, 'Usage: .lyrics <song>');
       let { data } = await axios.get(`https://api.princetechn.com/api/search/lyrics?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
@@ -535,9 +536,13 @@ async function handleCommand(ctx, { cmd, args }) {
       return sendBanner(ctx, `🎬 YTS Results:\n${getApiText(data)}`);
     }
 
+    // DEFAULT
     return false;
   } catch (e) {
-    return sendBanner(ctx, `❌ API error for ${cmd}.\n${(e.response?.data ? JSON.stringify(e.response.data) : e.message)}`);
+    let msg = e && e.response && e.response.data
+      ? (typeof e.response.data === 'object' ? JSON.stringify(e.response.data, null, 2) : e.response.data)
+      : (e.message || String(e));
+    return sendBanner(ctx, `❌ API error for ${cmd}.\n${msg}`);
   }
 }
 
