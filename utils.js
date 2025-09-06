@@ -63,11 +63,10 @@ function getMenuCaption(ctx, config, users) {
 
 function getBannerAndButtons() {
   return {
-    photo: 'https://files.catbox.moe/7dozqn.jpg',
+    photo: 'https://files.catbox.moe/2x9p8j.jpg',
     buttons: [
       [
-        { text: 'Telegram Channel', url: 'https://t.me/cybixtech' },
-        { text: 'WhatsApp Channel', url: 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X' }
+        { text: 'Telegram Channel', url: 'https://t.me/cybixtech' }
       ]
     ]
   };

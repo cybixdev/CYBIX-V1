@@ -11,7 +11,6 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
 const PORT = process.env.PORT || 8080;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || 'cybixtech';
-const SELF_URL = process.env.SELF_URL;
 
 if (!BOT_TOKEN || !OWNER_ID || !CHANNEL_USERNAME) {
   console.error('BOT_TOKEN, OWNER_ID, and CHANNEL_USERNAME must be set in .env');
@@ -19,7 +18,7 @@ if (!BOT_TOKEN || !OWNER_ID || !CHANNEL_USERNAME) {
 }
 const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 60_000 });
 
-// === PLUGINS MANAGEMENT (PLUGINS ARE OPTIONAL) ===
+// === PLUGINS MANAGEMENT ===
 const pluginsDir = path.join(__dirname, 'plugins');
 let loadedPlugins = [];
 function loadPlugins(bot) {
@@ -73,7 +72,7 @@ async function blockIfNotJoined(ctx, next) {
   await ctx.replyWithPhoto(
     { url: photo },
     {
-      caption: `🚫 *Access Denied*\n\nJoin our official Telegram and WhatsApp Channel to use this bot!`,
+      caption: `🚫 *Access Denied*\n\nJoin our official Telegram Channel to use this bot!`,
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: buttons }
     }
@@ -133,20 +132,12 @@ bot.hears(/^(\.|\/)setbotname\s+(.+)/i, async ctx => {
   await ctx.reply(`Bot name updated to: ${newName}`);
 });
 
-// Plugins: dynamic command handler (reserved for future use)
-
 // Fallback for other messages
 bot.on('message', async ctx => {
   await sendWithBanner(ctx, 'Send a command to see the menu.');
 });
 
-// === SELF-PINGING TO KEEP ALIVE ===
-if (SELF_URL) {
-  setInterval(() => {
-    axios.get(SELF_URL + '/ping').catch(()=>{});
-  }, 1000 * 60 * 5);
-}
-
+// === EXPRESS SERVER FOR DEPLOYMENT (REQUIRED BY RENDER/VERCEL/RAILWAY) ===
 const app = express();
 app.get('/', (req, res) => res.send('CYBIX BOT IS RUNNING'));
 app.get('/ping', (req, res) => res.send('pong'));
