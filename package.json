@@ -1,19 +1,16 @@
 {
   "name": "cybix-v1-bot",
   "version": "1.0.0",
-  "description": "CYBIX V1 - WhatsApp + Telegram Multi-User Bot",
+  "description": "CYBIX V1 WhatsApp + Telegram Multi-User Bot",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js"
   },
-  "author": "CYBIX DEVS",
-  "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.3",
     "telegraf": "^4.15.3",
     "dotenv": "^16.4.5",
     "fs-extra": "^11.2.0",
-    "pretty-ms": "^8.0.0",
-    "axios": "^1.8.0"
+    "pretty-ms": "^8.0.0"
   }
 }

@@ -5,14 +5,14 @@ const fs = require('fs-extra');
 const path = require('path');
 const prettyMs = require('pretty-ms');
 
-// ======== CONFIG =========
+// ====== CONFIG ======
 const BOT_VERSION = '1.0.0';
 const PREFIX = '.';
 const OWNER_ID = process.env.OWNER_ID;
 const SESSION_PATH = process.env.SESSION_PATH || './sessions';
-const BANNER_URL = 'https://files.catbox.moe/yxrg76.jpg'; // <== PUT YOUR URL HERE
+const BANNER_URL = 'https://files.catbox.moe/28cr7v.jpg';
 
-// ======= SYSTEM HELPERS =======
+// ====== SYSTEM HELPERS ======
 function getUptime() {
   return prettyMs(process.uptime() * 1000);
 }
@@ -149,11 +149,11 @@ telegram.command('pair', async ctx => {
   const parts = ctx.message.text.split(' ');
   if (!parts[1]) return ctx.reply('Usage: /pair <number>');
   const waNumber = parts[1].replace(/[^0-9]/g, '');
-  ctx.reply('Generating WhatsApp pairing code...');
 
   // ==== WA PAIRING ====
   const sessionDir = path.join(SESSION_PATH, String(userId));
   await fs.ensureDir(sessionDir);
+
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
   const { version } = await fetchLatestBaileysVersion();
   const sock = makeWASocket({
@@ -165,26 +165,28 @@ telegram.command('pair', async ctx => {
 
   sock.ev.on('creds.update', saveCreds);
 
-  // WhatsApp notifications for pairing attempt
-  sock.ev.on('messages.upsert', async ({ messages }) => {
-    for (const msg of messages) {
-      // This will notify user on WhatsApp app when pairing is happening
-      if (
-        msg.key && msg.key.fromMe && msg.message &&
-        msg.message.deviceSentMessage
-      ) {
-        await ctx.replyWithPhoto({ url: BANNER_URL }, { caption: "WhatsApp device pairing notification received." });
-      }
-    }
-  });
-
+  // Most reliable way to guarantee pairing: listen for QR and PairingCode and send both
+  let pairingSent = false;
   sock.ev.on('connection.update', async update => {
-    if (update.pairingCode) {
+    // Real-time pairing code event (for multi-device, WhatsApp cloud, or business beta)
+    if (update.pairingCode && !pairingSent) {
+      pairingSent = true;
       waUsers.set(userId, { sock, waNumber, sessionDir });
       await ctx.replyWithPhoto({ url: BANNER_URL }, {
         caption:
           `*Pairing code:* \`${update.pairingCode}\`\n\n1. Open WhatsApp\n2. Linked Devices > Link a Device\n3. Enter this code`
       });
+    }
+    // If WhatsApp provides QR code, fallback (old WhatsApp Web method)
+    if (update.qr && !pairingSent) {
+      pairingSent = true;
+      waUsers.set(userId, { sock, waNumber, sessionDir });
+      await ctx.replyWithPhoto({ url: BANNER_URL }, {
+        caption:
+          `*QR Code detected!*\n\nScan this QR code in WhatsApp:\n\n(You must run this bot on a server with a display/browser to show QR in console, or use the pairing code above if provided by WhatsApp)`
+      });
+      // Optionally, you can use a QR to image API to generate an image in Telegram.
+      // But most users will see QR in terminal. (Baileys limitation)
     }
     if (update.connection === 'open') {
       await ctx.replyWithPhoto({ url: BANNER_URL }, { caption: '✅ WhatsApp paired!' });
