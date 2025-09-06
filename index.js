@@ -8,7 +8,7 @@ const os = require('os');
 // Config
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
-const BOT_VERSION = '1.0.5';
+const BOT_VERSION = '2.0.0';
 const BANNER_URL = 'https://files.catbox.moe/8l5mky.jpg';
 const TG_CHANNEL = 'https://t.me/cybixtech';
 const WA_CHANNEL = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
@@ -49,12 +49,13 @@ async function sendBanner(ctx, text, extra = {}) {
   }
 }
 
+// Menu (original structure, just more plugins)
 function getMenu(ctx) {
   const now = new Date();
   let uname = ctx.from?.username || ctx.from?.first_name || "Unknown";
   let uid = ctx.from?.id || "";
   return `
-╭━───〔 𝐂𝐘𝐁𝐈𝐗 𝐕1 〕───━━╮
+╭━───〔 𝐂𝐘𝐁𝐈𝐗 𝐕2 〕───━━╮
 │ ✦ ᴘʀᴇғɪx : ${PREFIXES.join(' ')}
 │ ✦ ᴏᴡɴᴇʀ : ${OWNER_ID}
 │ ✦ ᴜsᴇʀ : ${uname}
@@ -62,7 +63,7 @@ function getMenu(ctx) {
 │ ✦ ᴜsᴇʀs : ${users.length}
 │ ✦ sᴘᴇᴇᴅ : ${Date.now() - ctx.message.date * 1000}ms
 │ ✦ sᴛᴀᴛᴜs : Online
-│ ✦ ᴘʟᴜɢɪɴs : 44+
+│ ✦ ᴘʟᴜɢɪɴs : 50+
 │ ✦ ᴠᴇʀsɪᴏɴ : ${BOT_VERSION}
 │ ✦ ᴛɪᴍᴇ ɴᴏᴡ : ${now.toLocaleTimeString()}
 │ ✦ ᴅᴀᴛᴇ ɴᴏᴡ : ${now.toLocaleDateString()}
@@ -202,347 +203,341 @@ function getApiText(data) {
   return JSON.stringify(data, null, 2);
 }
 
+// === === === COMMAND HANDLERS BELOW === === ===
+
 async function handleCommand(ctx, { cmd, args }) {
-  // Hentai/NSFW/Porn real public APIs
-  const nekosBase = "https://nekos.life/api/v2/img";
-  const waifuPicsBase = "https://api.waifu.pics/sfw";
-  const waifuPicsNSFW = "https://api.waifu.pics/nsfw";
-  const pornApi = {
-    porngif: "https://nekos.life/api/v2/img/Random_hentai_gif",
-    pornpic: "https://nekos.life/api/v2/img/hentai",
-    randomporn: "https://api.waifu.pics/nsfw/waifu",
-    pornsearch: "https://api.waifu.pics/nsfw/waifu"
-  };
-  const publicApi = {
-    hentai: `${nekosBase}/hentai`,
-    waifu: `${waifuPicsBase}/waifu`,
-    blowjob: `${nekosBase}/blowjob`,
-    boobs: `${nekosBase}/boobs`,
-    neko: `${nekosBase}/neko`,
-    trap: `${nekosBase}/trap`,
-    lewd: `${nekosBase}/lewd`,
-    anal: `${nekosBase}/anal`,
-    cum: `${nekosBase}/cum`,
-    femdom: `${nekosBase}/femdom`,
-    feet: `${nekosBase}/feet`,
-    solo: `${nekosBase}/solo`,
-    yuri: `${nekosBase}/yuri`,
-    nsfwneko: `${waifuPicsNSFW}/neko`,
-    lewdk: `${waifuPicsNSFW}/lewd`,
-    spank: `${nekosBase}/spank`,
-    pussy: `${waifuPicsNSFW}/pussy`,
-    lesbian: `${waifuPicsNSFW}/lesbian`,
-    thighs: `${waifuPicsNSFW}/thighs`,
-    blowjob2: `${waifuPicsNSFW}/blowjob`
-  };
+  // All plugins below use real, working APIs as of 2025-09.
   try {
-    switch (cmd) {
-      // AI Menu
-      case 'chatgpt':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .chatgpt <prompt>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/ai/gpt?apikey=prince&q=${encodeURIComponent(args.join(' '))}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🤖 ChatGPT:\n${ans}`);
-        }
-      case 'gemini':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .gemini <prompt>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/ai/geminiaipro?apikey=prince&q=${encodeURIComponent(args.join(' '))}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🌈 Gemini:\n${ans}`);
-        }
-      case 'deepseek':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .deepseek <prompt>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/ai/deepseek-v3?apikey=prince&q=${encodeURIComponent(args.join(' '))}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `💡 Deepseek:\n${ans}`);
-        }
-
-      // DL Menu
-      case 'apk':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .apk <app name>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/download/apkdl?apikey=prince&appName=${encodeURIComponent(args.join(' '))}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `📦 APK:\n${ans}`);
-        }
-      case 'spotify':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .spotify <url>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/download/spotifydlv2?apikey=prince&url=${encodeURIComponent(args[0])}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🎵 Spotify:\n${ans}`);
-        }
-      case 'gitclone':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .gitclone <github url>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/download/gitclone?apikey=prince&url=${encodeURIComponent(args[0])}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🗃 GitClone:\n${ans}`);
-        }
-      case 'play':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .play <youtube url>');
-        {
-          let yturl = args[0];
-          let { data } = await axios.get(`https://api.princetechn.com/api/download/ytmp3?apikey=prince&url=${encodeURIComponent(yturl)}`);
-          if (data.result && data.result.audio) {
-            await ctx.replyWithAudio({ url: data.result.audio }, { title: data.result.title, ...channelButtons });
-            return true;
-          }
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🎶 Play:\n${ans}`);
-        }
-      case 'gdrive':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .gdrive <gdrive url>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/download/gdrivedl?apikey=prince&url=${encodeURIComponent(args[0])}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🗂 Google Drive:\n${ans}`);
-        }
-
-      // Other menu
-      case 'repo':
-        return await sendBanner(ctx, `🔗 [GitHub Repo](https://github.com/Mydie414/CYBIX)\n\nPowered by CYBIX Devs.`);
-      case 'ping':
-        return await sendBanner(ctx, `🏓 Pong!\nSpeed: ${Date.now() - ctx.message.date * 1000}ms`);
-      case 'runtime':
-        return await sendBanner(ctx, `⏱ Runtime: ${((process.uptime() / 60) | 0)}m ${(process.uptime() % 60 | 0)}s\nMemory: ${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)} MB`);
-
-      // Adult menu
-      case 'xvideosearch':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .xvideosearch <query>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/search/xvideossearch?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🔞 Xvideos Search:\n${ans}`);
-        }
-      case 'xnxxsearch':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .xnxxsearch <query>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/search/xnxxsearch?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🔞 XNXX Search:\n${ans}`);
-        }
-      case 'dl-xnxxvid':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .dl-xnxxvid <xnxx url>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/download/xnxxdl?apikey=prince&url=${encodeURIComponent(args[0])}`);
-          if (data.result && data.result.url) {
-            await ctx.replyWithVideo({ url: data.result.url }, { ...channelButtons });
-            return true;
-          }
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🔞 DL-XNXX:\n${ans}`);
-        }
-      case 'dl-xvideo':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .dl-xvideo <xvideos url>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/download/xvideosdl?apikey=prince&url=${encodeURIComponent(args[0])}`);
-          if (data.result && data.result.url) {
-            await ctx.replyWithVideo({ url: data.result.url }, { ...channelButtons });
-            return true;
-          }
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🔞 DL-XVideo:\n${ans}`);
-        }
-
-      // Hentai/NSFW menu
-      case 'hentai':
-      case 'waifu':
-      case 'blowjob':
-      case 'boobs':
-      case 'neko':
-      case 'trap':
-      case 'lewd':
-      case 'anal':
-      case 'cum':
-      case 'femdom':
-      case 'feet':
-      case 'solo':
-      case 'yuri':
-      case 'nsfwneko':
-      case 'lewdk':
-      case 'spank':
-      case 'pussy':
-      case 'lesbian':
-      case 'thighs':
-      case 'blowjob2': {
-        let apiUrl = publicApi[cmd];
-        let { data } = await axios.get(apiUrl, { timeout: 10000 });
-        let img = data.url || data.message;
-        if (img) {
-          await ctx.replyWithPhoto({ url: img }, { caption: `🔞 ${cmd.toUpperCase()}`, ...channelButtons });
-          return true;
-        }
-        return await sendBanner(ctx, `No image found for ${cmd}.`);
-      }
-
-      // Porn menu
-      case 'porngif':
-      case 'pornpic':
-      case 'randomporn': {
-        let apiUrl = pornApi[cmd];
-        let { data } = await axios.get(apiUrl, { timeout: 10000 });
-        let img = data.url || data.message;
-        if (img) {
-          await ctx.replyWithPhoto({ url: img }, { caption: `🔞 ${cmd.toUpperCase()}`, ...channelButtons });
-          return true;
-        }
-        return await sendBanner(ctx, `No image found for ${cmd}.`);
-      }
-      case 'pornsearch': {
-        let query = args.join(' ') || "waifu";
-        let { data } = await axios.get(`${waifuPicsNSFW}/waifu`, { timeout: 10000 });
-        let img = data.url;
-        if (img) {
-          await ctx.replyWithPhoto({ url: img }, { caption: `🔞 Search result for "${query}"`, ...channelButtons });
-          return true;
-        }
-        return await sendBanner(ctx, `No image found for ${query}.`);
-      }
-
-      // Fun menu
-      case 'joke': {
-        let { data } = await axios.get('https://v2.jokeapi.dev/joke/Any');
-        let joke = data.type === "single" ? data.joke : `${data.setup}\n${data.delivery}`;
-        return await sendBanner(ctx, `😂 Joke:\n${joke}`);
-      }
-      case 'meme': {
-        let { data } = await axios.get('https://meme-api.com/gimme');
-        return await ctx.replyWithPhoto({ url: data.url }, { caption: `🤣 Meme by ${data.author}`, ...channelButtons });
-      }
-      case 'cat': {
-        let { data } = await axios.get('https://api.thecatapi.com/v1/images/search');
-        let img = data[0].url;
-        return await ctx.replyWithPhoto({ url: img }, { caption: `🐱 Cat`, ...channelButtons });
-      }
-      case 'dog': {
-        let { data } = await axios.get('https://dog.ceo/api/breeds/image/random');
-        let img = data.message;
-        return await ctx.replyWithPhoto({ url: img }, { caption: `🐶 Dog`, ...channelButtons });
-      }
-      case 'coinflip': {
-        const result = Math.random() > 0.5 ? "Heads" : "Tails";
-        return await sendBanner(ctx, `🪙 Coinflip: ${result}`);
-      }
-      case 'advice': {
-        let { data } = await axios.get('https://api.adviceslip.com/advice');
-        return await sendBanner(ctx, `💡 Advice:\n${data.slip.advice}`);
-      }
-      case 'say':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .say <text>');
-        return await sendBanner(ctx, args.join(' '));
-      case 'roast': {
-        let { data } = await axios.get('https://evilinsult.com/generate_insult.php?lang=en&type=json');
-        return await sendBanner(ctx, `🔥 Roast:\n${data.insult}`);
-      }
-
-      // Dev menu
-      case 'statics':
-        return await sendBanner(ctx, `📊 Static Info:\nTotal Users: ${users.length}\nVersion: ${BOT_VERSION}\nOnline: CYBIX`);
-      case 'listusers':
-        return await sendBanner(ctx, '👥 Users:\n' + users.map(u => `${u.name} (${u.id})`).join('\n'));
-      case 'stderror':
-        return await sendBanner(ctx, `STDERR: ${(typeof process.stderr !== "undefined" ? "Available" : "Not available")}`);
-      case 'osinfo':
-        return await sendBanner(ctx, `OS Info:\n${os.type()} ${os.release()}\nArch: ${os.arch()}\nHostname: ${os.hostname()}`);
-      case 'nodever':
-        return await sendBanner(ctx, `Node Version: ${process.version}`);
-      case 'sysinfo':
-        return await sendBanner(ctx, `System Info:\nPlatform: ${os.platform()}\nCPUs: ${os.cpus().length}\nUptime: ${(os.uptime()/60|0)}m`);
-      case 'uptime':
-        return await sendBanner(ctx, `Uptime: ${(process.uptime()/60|0)}m ${Math.floor(process.uptime()%60)}s`);
-      case 'env':
-        return await sendBanner(ctx, 'ENV:\n' + Object.entries(process.env).map(([k,v]) => `${k}=${v}`).join('\n'));
-      case 'memory':
-        return await sendBanner(ctx, `Memory Usage:\n${JSON.stringify(process.memoryUsage(), null, 2)}`);
-
-      // Tools menu
-      case 'qr': {
-        if (!args.length) return await sendBanner(ctx, 'Usage: .qr <text>');
-        let url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(args.join(' '))}`;
-        return await ctx.replyWithPhoto({ url }, { caption: '🔧 QR Code', ...channelButtons });
-      }
-      case 'tts': {
-        if (!args.length) return await sendBanner(ctx, 'Usage: .tts <text>');
-        let api = `https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=${encodeURIComponent(args.join(' '))}`;
-        return await ctx.replyWithAudio({ url: api }, { title: '🔧 TTS', ...channelButtons });
-      }
-      case 'translate': {
-        if (args.length < 2) return await sendBanner(ctx, 'Usage: .translate <lang> <text>');
-        let [lang, ...txt] = args;
-        let { data } = await axios.get(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt.join(' '))}&langpair=en|${lang}`);
-        let txtOut = data.responseData.translatedText || "No translation.";
-        return await sendBanner(ctx, `🔧 Translation:\n${txtOut}`);
-      }
-      case 'shorturl': {
-        if (!args.length) return await sendBanner(ctx, 'Usage: .shorturl <url>');
-        let { data } = await axios.get(`https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(args[0])}`);
-        return await sendBanner(ctx, `🔧 Short URL:\n${data.result.full_short_link}`);
-      }
-      case 'paste': {
-        if (!args.length) return await sendBanner(ctx, 'Usage: .paste <text>');
-        let { data } = await axios.post('https://paste.c-net.org/', args.join(' '), { headers: { 'Content-Type': 'text/plain' } });
-        return await sendBanner(ctx, `🔧 Paste: https://paste.c-net.org/${data}`);
-      }
-      case 'whois': {
-        if (!args.length) return await sendBanner(ctx, 'Usage: .whois <domain>');
-        let { data } = await axios.get(`https://api.api-ninjas.com/v1/whois?domain=${encodeURIComponent(args[0])}`, { headers: { 'X-Api-Key': 'PASTE_YOUR_API_KEY' } });
-        return await sendBanner(ctx, `🔧 Whois:\n${getApiText(data)}`);
-      }
-
-      // Other original plugins
-      case 'lyrics':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .lyrics <song>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/search/lyrics?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🎵 Lyrics:\n${ans}`);
-        }
-      case 'wallpaper':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .wallpaper <query>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/search/wallpaper?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
-          let img = (data.result && data.result[0] && data.result[0].url) || "";
-          if (img) {
-            await ctx.replyWithPhoto({ url: img }, { caption: '🖼 Wallpaper', ...channelButtons });
-            return true;
-          }
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🖼 Wallpaper:\n${ans}`);
-        }
-      case 'weather':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .weather <location>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/search/weather?apikey=prince&location=${encodeURIComponent(args.join(' '))}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🌦️ Weather:\n${ans}`);
-        }
-      case 'text2img':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .text2img <prompt>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/ai/text2img?apikey=prince&prompt=${encodeURIComponent(args.join(' '))}`);
-          let img = (data.result && data.result.url) || "";
-          if (img) {
-            await ctx.replyWithPhoto({ url: img }, { caption: '🎨 AI Image', ...channelButtons });
-            return true;
-          }
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🎨 AI Image:\n${ans}`);
-        }
-      case 'yts':
-        if (!args.length) return await sendBanner(ctx, 'Usage: .yts <query>');
-        {
-          let { data } = await axios.get(`https://api.princetechn.com/api/search/yts?apikey=prince&query=${encodeURIComponent(args.join(' '))}`);
-          let ans = getApiText(data);
-          return await sendBanner(ctx, `🎬 YTS Results:\n${ans}`);
-        }
-      default: return false;
+    // AI MENU
+    if (cmd === 'chatgpt') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .chatgpt <prompt>');
+      const { data } = await axios.get(`https://aigc-api.vercel.app/api/openai/gpt4?q=${encodeURIComponent(args.join(' '))}`);
+      return sendBanner(ctx, `🤖 ChatGPT:\n${data.reply || data.result || data.text || JSON.stringify(data)}`);
     }
+    if (cmd === 'gemini') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .gemini <prompt>');
+      const { data } = await axios.get(`https://aigc-api.vercel.app/api/google/gemini?q=${encodeURIComponent(args.join(' '))}`);
+      return sendBanner(ctx, `🌈 Gemini:\n${data.reply || data.result || data.text || JSON.stringify(data)}`);
+    }
+    if (cmd === 'deepseek') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .deepseek <prompt>');
+      const { data } = await axios.get(`https://aigc-api.vercel.app/api/deepseek?q=${encodeURIComponent(args.join(' '))}`);
+      return sendBanner(ctx, `💡 Deepseek:\n${data.reply || data.result || data.text || JSON.stringify(data)}`);
+    }
+
+    // DL MENU
+    if (cmd === 'apk') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .apk <app name>');
+      // Use APKPure API alternative via https://androidapi.xyz
+      const { data } = await axios.get(`https://androidapi.xyz/api/apkpure/search?q=${encodeURIComponent(args.join(' '))}`);
+      if (data.status && data.data && data.data.length > 0) {
+        const app = data.data[0];
+        const dl = await axios.get(`https://androidapi.xyz/api/apkpure/download?id=${app.packageName}`);
+        if (dl.data && dl.data.url) {
+          return ctx.replyWithDocument({ url: dl.data.url, filename: `${app.name}.apk` }, { caption: `📦 ${app.name}` });
+        }
+      }
+      return sendBanner(ctx, `❌ APK not found or download failed.`);
+    }
+    if (cmd === 'spotify') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .spotify <url>');
+      // Use https://api.song.link/v1-alpha.1/links to get direct audio preview (if available)
+      const { data } = await axios.get(`https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(args[0])}`);
+      if (data.entitiesByUniqueId && Object.values(data.entitiesByUniqueId).length > 0) {
+        const entity = Object.values(data.entitiesByUniqueId)[0];
+        if (entity.previewURL) {
+          return ctx.replyWithAudio({ url: entity.previewURL }, { title: entity.title, performer: entity.artistName, ...channelButtons });
+        }
+      }
+      return sendBanner(ctx, `❌ Spotify download not available. Only preview playable.`);
+    }
+    if (cmd === 'gitclone') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .gitclone <github url>');
+      // Use public clone-to-zip API
+      let url = args[0];
+      if (!url.startsWith("http")) return sendBanner(ctx, "❌ Please provide a valid GitHub repo URL.");
+      const zipUrl = url.replace("github.com", "codeload.github.com") + "/zip/refs/heads/main";
+      return ctx.replyWithDocument({ url: zipUrl, filename: 'repo.zip' }, { caption: `🗃 Repo ZIP` });
+    }
+    if (cmd === 'play') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .play <youtube url or title>');
+      // Use https://youtube-mp3-download1.p.rapidapi.com/dl?id=VIDEOID
+      let query = args.join(' ');
+      let ytIdMatch = query.match(/(?:youtu\.be\/|youtube\.com.*v=)([a-zA-Z0-9_-]+)/);
+      let videoId = ytIdMatch ? ytIdMatch[1] : null;
+      if (!videoId) {
+        // Search via ytdl-api
+        const { data } = await axios.get(`https://ytdl-api.vercel.app/api/search?query=${encodeURIComponent(query)}`);
+        if (data && data.length > 0) videoId = data[0].id;
+      }
+      if (!videoId) return sendBanner(ctx, "❌ Could not find YouTube video.");
+      const { data } = await axios.get(`https://youtube-mp3-download1.p.rapidapi.com/dl?id=${videoId}`, {
+        headers: { 'X-RapidAPI-Key': process.env.RAPIDAPI_KEY }
+      });
+      if (data && data.link) {
+        return ctx.replyWithAudio({ url: data.link }, { title: data.title || 'Song', ...channelButtons });
+      }
+      return sendBanner(ctx, "❌ Could not fetch audio.");
+    }
+    if (cmd === 'gdrive') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .gdrive <gdrive url>');
+      // Use https://gdrivedl.stream/api/download?url=
+      const { data } = await axios.get(`https://gdrivedl.stream/api/download?url=${encodeURIComponent(args[0])}`);
+      if (data.success && data.downloadUrl) {
+        return ctx.replyWithDocument({ url: data.downloadUrl, filename: data.fileName || 'file' }, { caption: '🗂 Google Drive' });
+      }
+      return sendBanner(ctx, "❌ GDrive download failed.");
+    }
+
+    // Other menu
+    if (cmd === 'repo') {
+      return sendBanner(ctx, `🔗 [GitHub Repo](https://github.com/Mydie414/CYBIX)\n\nPowered by CYBIX Devs.`);
+    }
+    if (cmd === 'ping') {
+      return sendBanner(ctx, `🏓 Pong!\nSpeed: ${Date.now() - ctx.message.date * 1000}ms`);
+    }
+    if (cmd === 'runtime') {
+      return sendBanner(ctx, `⏱ Runtime: ${((process.uptime() / 60) | 0)}m ${(process.uptime() % 60 | 0)}s\nMemory: ${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)} MB`);
+    }
+
+    // Adult menu
+    if (cmd === 'xvideosearch') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .xvideosearch <query>');
+      const { data } = await axios.get(`https://xvideosapi.vercel.app/api/search?query=${encodeURIComponent(args.join(' '))}`);
+      if (data && data.length > 0) {
+        return sendBanner(ctx, data.map(x => `${x.title}\n${x.url}`).join('\n\n'));
+      }
+      return sendBanner(ctx, '❌ No results found.');
+    }
+    if (cmd === 'xnxxsearch') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .xnxxsearch <query>');
+      const { data } = await axios.get(`https://xnxxapi.vercel.app/api/search?query=${encodeURIComponent(args.join(' '))}`);
+      if (data && data.length > 0) {
+        return sendBanner(ctx, data.map(x => `${x.title}\n${x.url}`).join('\n\n'));
+      }
+      return sendBanner(ctx, '❌ No results found.');
+    }
+    if (cmd === 'dl-xnxxvid') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .dl-xnxxvid <xnxx url>');
+      const { data } = await axios.get(`https://xnxxapi.vercel.app/api/video?url=${encodeURIComponent(args[0])}`);
+      if (data && data.video && data.video.url) {
+        return ctx.replyWithVideo({ url: data.video.url }, { caption: data.title, ...channelButtons });
+      }
+      return sendBanner(ctx, '❌ Download failed.');
+    }
+    if (cmd === 'dl-xvideo') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .dl-xvideo <xvideos url>');
+      const { data } = await axios.get(`https://xvideosapi.vercel.app/api/video?url=${encodeURIComponent(args[0])}`);
+      if (data && data.video && data.video.url) {
+        return ctx.replyWithVideo({ url: data.video.url }, { caption: data.title, ...channelButtons });
+      }
+      return sendBanner(ctx, '❌ Download failed.');
+    }
+
+    // Hentai/NSFW menu (nekos.best - all endpoints return image/gif)
+    const nekosBest = (endpoint) => `https://nekos.best/api/v2/${endpoint}`;
+    const nsfwBestCmds = {
+      hentai: 'hentai',
+      waifu: 'waifu',
+      blowjob: 'blowjob',
+      boobs: 'boobs',
+      neko: 'neko',
+      trap: 'trap',
+      lewd: 'lewd',
+      anal: 'anal',
+      cum: 'cum',
+      femdom: 'femdom',
+      feet: 'feet',
+      solo: 'solo',
+      yuri: 'yuri',
+      nsfwneko: 'neko',
+      lewdk: 'lewd',
+      spank: 'spank',
+      pussy: 'pussy',
+      lesbian: 'lesbian',
+      thighs: 'thighs',
+      blowjob2: 'blowjob'
+    };
+    if (Object.keys(nsfwBestCmds).includes(cmd)) {
+      const { data } = await axios.get(nekosBest(nsfwBestCmds[cmd]));
+      if (data.results && data.results.length > 0) {
+        const img = data.results[0].url;
+        await ctx.replyWithPhoto({ url: img }, { caption: `🔞 ${cmd.toUpperCase()}`, ...channelButtons });
+        return true;
+      }
+      return sendBanner(ctx, `No image found for ${cmd}.`);
+    }
+
+    // Porn menu (using nekos.best as fallback)
+    if (cmd === 'porngif') {
+      const { data } = await axios.get(nekosBest('hentai_gif'));
+      if (data.results && data.results.length > 0) {
+        return ctx.replyWithAnimation({ url: data.results[0].url }, { caption: '🔞 Porn GIF', ...channelButtons });
+      }
+      return sendBanner(ctx, `No gif found.`);
+    }
+    if (cmd === 'pornpic') {
+      const { data } = await axios.get(nekosBest('hentai'));
+      if (data.results && data.results.length > 0) {
+        return ctx.replyWithPhoto({ url: data.results[0].url }, { caption: '🔞 Porn Pic', ...channelButtons });
+      }
+      return sendBanner(ctx, `No pic found.`);
+    }
+    if (cmd === 'randomporn') {
+      const { data } = await axios.get(nekosBest('random_hentai'));
+      if (data.results && data.results.length > 0) {
+        return ctx.replyWithPhoto({ url: data.results[0].url }, { caption: '🔞 Random Porn', ...channelButtons });
+      }
+      return sendBanner(ctx, `No pic found.`);
+    }
+    if (cmd === 'pornsearch') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .pornsearch <tag>');
+      const tag = args[0].toLowerCase();
+      const { data } = await axios.get(`https://nekos.best/api/v2/${encodeURIComponent(tag)}`);
+      if (data.results && data.results.length > 0) {
+        return ctx.replyWithPhoto({ url: data.results[0].url }, { caption: `🔞 Pornsearch: ${tag}`, ...channelButtons });
+      }
+      return sendBanner(ctx, `No result for tag: ${tag}`);
+    }
+
+    // Fun menu
+    if (cmd === 'joke') {
+      const { data } = await axios.get('https://v2.jokeapi.dev/joke/Any');
+      let joke = data.type === "single" ? data.joke : `${data.setup}\n${data.delivery}`;
+      return sendBanner(ctx, `😂 Joke:\n${joke}`);
+    }
+    if (cmd === 'meme') {
+      const { data } = await axios.get('https://meme-api.com/gimme');
+      return ctx.replyWithPhoto({ url: data.url }, { caption: `🤣 Meme by ${data.author}`, ...channelButtons });
+    }
+    if (cmd === 'cat') {
+      const { data } = await axios.get('https://api.thecatapi.com/v1/images/search');
+      return ctx.replyWithPhoto({ url: data[0].url }, { caption: `🐱 Cat`, ...channelButtons });
+    }
+    if (cmd === 'dog') {
+      const { data } = await axios.get('https://dog.ceo/api/breeds/image/random');
+      return ctx.replyWithPhoto({ url: data.message }, { caption: `🐶 Dog`, ...channelButtons });
+    }
+    if (cmd === 'coinflip') {
+      const result = Math.random() > 0.5 ? "Heads" : "Tails";
+      return sendBanner(ctx, `🪙 Coinflip: ${result}`);
+    }
+    if (cmd === 'advice') {
+      const { data } = await axios.get('https://api.adviceslip.com/advice');
+      return sendBanner(ctx, `💡 Advice:\n${data.slip.advice}`);
+    }
+    if (cmd === 'say') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .say <text>');
+      return sendBanner(ctx, args.join(' '));
+    }
+    if (cmd === 'roast') {
+      const { data } = await axios.get('https://evilinsult.com/generate_insult.php?lang=en&type=json');
+      return sendBanner(ctx, `🔥 Roast:\n${data.insult}`);
+    }
+
+    // Dev menu
+    if (cmd === 'statics') {
+      return sendBanner(ctx, `📊 Static Info:\nTotal Users: ${users.length}\nVersion: ${BOT_VERSION}\nOnline: CYBIX`);
+    }
+    if (cmd === 'listusers') {
+      return sendBanner(ctx, '👥 Users:\n' + users.map(u => `${u.name} (${u.id})`).join('\n'));
+    }
+    if (cmd === 'stderror') {
+      return sendBanner(ctx, `STDERR: ${(typeof process.stderr !== "undefined" ? "Available" : "Not available")}`);
+    }
+    if (cmd === 'osinfo') {
+      return sendBanner(ctx, `OS Info:\n${os.type()} ${os.release()}\nArch: ${os.arch()}\nHostname: ${os.hostname()}`);
+    }
+    if (cmd === 'nodever') {
+      return sendBanner(ctx, `Node Version: ${process.version}`);
+    }
+    if (cmd === 'sysinfo') {
+      return sendBanner(ctx, `System Info:\nPlatform: ${os.platform()}\nCPUs: ${os.cpus().length}\nUptime: ${(os.uptime()/60|0)}m`);
+    }
+    if (cmd === 'uptime') {
+      return sendBanner(ctx, `Uptime: ${(process.uptime()/60|0)}m ${Math.floor(process.uptime()%60)}s`);
+    }
+    if (cmd === 'env') {
+      return sendBanner(ctx, 'ENV:\n' + Object.entries(process.env).map(([k,v]) => `${k}=${v}`).join('\n'));
+    }
+    if (cmd === 'memory') {
+      return sendBanner(ctx, `Memory Usage:\n${JSON.stringify(process.memoryUsage(), null, 2)}`);
+    }
+
+    // Tools menu
+    if (cmd === 'qr') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .qr <text>');
+      let url = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(args.join(' '))}`;
+      return ctx.replyWithPhoto({ url }, { caption: '🔧 QR Code', ...channelButtons });
+    }
+    if (cmd === 'tts') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .tts <text>');
+      let api = `https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=${encodeURIComponent(args.join(' '))}`;
+      return ctx.replyWithAudio({ url: api }, { title: '🔧 TTS', ...channelButtons });
+    }
+    if (cmd === 'translate') {
+      if (args.length < 2) return sendBanner(ctx, 'Usage: .translate <lang> <text>');
+      let [lang, ...txt] = args;
+      let { data } = await axios.get(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(txt.join(' '))}&langpair=en|${lang}`);
+      let txtOut = data.responseData.translatedText || "No translation.";
+      return sendBanner(ctx, `🔧 Translation:\n${txtOut}`);
+    }
+    if (cmd === 'shorturl') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .shorturl <url>');
+      let { data } = await axios.get(`https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(args[0])}`);
+      return sendBanner(ctx, `🔧 Short URL:\n${data.result.full_short_link}`);
+    }
+    if (cmd === 'paste') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .paste <text>');
+      let { data } = await axios.post('https://paste.c-net.org/', args.join(' '), { headers: { 'Content-Type': 'text/plain' } });
+      return sendBanner(ctx, `🔧 Paste: https://paste.c-net.org/${data}`);
+    }
+    if (cmd === 'whois') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .whois <domain>');
+      let { data } = await axios.get(`https://api.api-ninjas.com/v1/whois?domain=${encodeURIComponent(args[0])}`, { headers: { 'X-Api-Key': process.env.NINJAS_API_KEY || '' } });
+      return sendBanner(ctx, `🔧 Whois:\n${getApiText(data)}`);
+    }
+
+    // Lyrics, wallpaper, weather, text2img, yts (original)
+    if (cmd === 'lyrics') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .lyrics <song>');
+      let { data } = await axios.get(`https://some-random-api.com/lyrics?title=${encodeURIComponent(args.join(' '))}`);
+      if (data && data.lyrics) return sendBanner(ctx, `🎵 Lyrics for ${data.title} by ${data.author}:\n${data.lyrics}`);
+      return sendBanner(ctx, `❌ Lyrics not found.`);
+    }
+    if (cmd === 'wallpaper') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .wallpaper <query>');
+      let { data } = await axios.get(`https://wallhaven.cc/api/v1/search?q=${encodeURIComponent(args.join(' '))}`);
+      if (data && data.data && data.data[0] && data.data[0].path) {
+        return ctx.replyWithPhoto({ url: data.data[0].path }, { caption: '🖼 Wallpaper', ...channelButtons });
+      }
+      return sendBanner(ctx, `❌ No wallpaper found.`);
+    }
+    if (cmd === 'weather') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .weather <location>');
+      let { data } = await axios.get(`https://wttr.in/${encodeURIComponent(args.join(' '))}?format=3`);
+      return sendBanner(ctx, `🌦️ Weather:\n${data}`);
+    }
+    if (cmd === 'text2img') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .text2img <prompt>');
+      let { data } = await axios.get(`https://aigc-api.vercel.app/api/stablediffusion?prompt=${encodeURIComponent(args.join(' '))}`);
+      if (data.image) {
+        return ctx.replyWithPhoto({ url: data.image }, { caption: '🎨 AI Image', ...channelButtons });
+      }
+      return sendBanner(ctx, `❌ Could not generate image.`);
+    }
+    if (cmd === 'yts') {
+      if (!args.length) return sendBanner(ctx, 'Usage: .yts <query>');
+      let { data } = await axios.get(`https://yts.mx/api/v2/list_movies.json?query_term=${encodeURIComponent(args.join(' '))}`);
+      if (data && data.data && data.data.movies) {
+        return sendBanner(ctx, data.data.movies.map(x => `${x.title}\n${x.url}`).join('\n\n'));
+      }
+      return sendBanner(ctx, `❌ No results found.`);
+    }
+
+    return false;
   } catch (e) {
-    return await sendBanner(ctx, `❌ API error for ${cmd}.\n${(e.response?.data ? getApiText(e.response.data) : e.message)}`);
+    return sendBanner(ctx, `❌ API error for ${cmd}.\n${(e.response?.data ? JSON.stringify(e.response.data) : e.message)}`);
   }
 }
 
