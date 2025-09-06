@@ -137,7 +137,6 @@ for (const regex of menuRegexes) {
 
 // Robust API response field parser
 function getApiText(data) {
-  // Try to find the first string result, else JSON.stringify
   if (!data) return "";
   if (typeof data === "string") return data;
   if (typeof data.result === "string") return data.result;
@@ -145,11 +144,9 @@ function getApiText(data) {
   if (typeof data.text === "string") return data.text;
   if (Array.isArray(data.result) && typeof data.result[0] === "string") return data.result.join('\n');
   if (Array.isArray(data.result) && typeof data.result[0] === "object") {
-    // Try to join result urls/titles if possible
     return data.result.map(x => x.url || x.title || JSON.stringify(x)).join('\n');
   }
   if (typeof data.result === "object") {
-    // Try to flatten object
     let txt = "";
     for (const k in data.result) {
       if (typeof data.result[k] === "string") txt += `${k}: ${data.result[k]}\n`;
@@ -162,27 +159,17 @@ function getApiText(data) {
 
 // Plugin handler
 async function handleCommand(ctx, { cmd, args }) {
-  // All command names in lower case
   switch (cmd) {
     case 'ping':
       return await sendBanner(ctx, `🏓 Pong!\nSpeed: ${Date.now() - ctx.message.date * 1000}ms`);
-
     case 'repo':
-      return await sendBanner(ctx, `NOT AVAILABLE.`);
-
+      return await sendBanner(ctx, `🔗 [GitHub Repo](https://github.com/Mydie414/CYBIX)\n\nPowered by CYBIX Devs.`);
     case 'runtime':
-      return await sendBanner(ctx,
-        `⏱ Runtime: ${((process.uptime() / 60) | 0)}m ${(process.uptime() % 60 | 0)}s\nMemory: ${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)} MB`
-      );
-
+      return await sendBanner(ctx, `⏱ Runtime: ${((process.uptime() / 60) | 0)}m ${(process.uptime() % 60 | 0)}s\nMemory: ${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)} MB`);
     case 'statics':
-      return await sendBanner(ctx,
-        `📊 Static Info:\nTotal Users: ${users.length}\nVersion: ${BOT_VERSION}\nOnline: CYBIX`
-      );
-
+      return await sendBanner(ctx, `📊 Static Info:\nTotal Users: ${users.length}\nVersion: ${BOT_VERSION}\nOnline: CYBIX`);
     case 'listusers':
       return await sendBanner(ctx, '👥 Users:\n' + users.map(u => `${u.name} (${u.id})`).join('\n'));
-
     case 'chatgpt':
       if (!args.length) return await sendBanner(ctx, 'Usage: .chatgpt <prompt>');
       try {
@@ -192,7 +179,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ ChatGPT API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'gemini':
       if (!args.length) return await sendBanner(ctx, 'Usage: .gemini <prompt>');
       try {
@@ -202,7 +188,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ Gemini API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'deepseek':
       if (!args.length) return await sendBanner(ctx, 'Usage: .deepseek <prompt>');
       try {
@@ -212,7 +197,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ Deepseek API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'apk':
       if (!args.length) return await sendBanner(ctx, 'Usage: .apk <app name>');
       try {
@@ -222,7 +206,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ APK API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'spotify':
       if (!args.length) return await sendBanner(ctx, 'Usage: .spotify <url>');
       try {
@@ -232,7 +215,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ Spotify API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'gitclone':
       if (!args.length) return await sendBanner(ctx, 'Usage: .gitclone <github url>');
       try {
@@ -242,7 +224,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ GitClone API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'play':
       if (!args.length) return await sendBanner(ctx, 'Usage: .play <youtube url>');
       try {
@@ -257,7 +238,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ Play API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'gdrive':
       if (!args.length) return await sendBanner(ctx, 'Usage: .gdrive <gdrive url>');
       try {
@@ -267,7 +247,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ GDrive API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'xvideosearch':
       if (!args.length) return await sendBanner(ctx, 'Usage: .xvideosearch <query>');
       try {
@@ -277,7 +256,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ Xvideos API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'xnxxsearch':
       if (!args.length) return await sendBanner(ctx, 'Usage: .xnxxsearch <query>');
       try {
@@ -287,7 +265,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ XNXX API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'dl-xnxxvid':
       if (!args.length) return await sendBanner(ctx, 'Usage: .dl-xnxxvid <xnxx url>');
       try {
@@ -301,7 +278,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ XNXXDL API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'dl-xvideo':
       if (!args.length) return await sendBanner(ctx, 'Usage: .dl-xvideo <xvideos url>');
       try {
@@ -315,7 +291,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ XVideosDL API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'lyrics':
       if (!args.length) return await sendBanner(ctx, 'Usage: .lyrics <song>');
       try {
@@ -325,7 +300,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ Lyrics API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'wallpaper':
       if (!args.length) return await sendBanner(ctx, 'Usage: .wallpaper <query>');
       try {
@@ -340,7 +314,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ Wallpaper API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'weather':
       if (!args.length) return await sendBanner(ctx, 'Usage: .weather <location>');
       try {
@@ -350,7 +323,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ Weather API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'text2img':
       if (!args.length) return await sendBanner(ctx, 'Usage: .text2img <prompt>');
       try {
@@ -365,7 +337,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ Text2Img API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     case 'yts':
       if (!args.length) return await sendBanner(ctx, 'Usage: .yts <query>');
       try {
@@ -375,7 +346,6 @@ async function handleCommand(ctx, { cmd, args }) {
       } catch (e) {
         return await sendBanner(ctx, `❌ YTS API error.\n${e.response?.data ? getApiText(e.response.data) : ''}`);
       }
-
     default: return false;
   }
 }
@@ -384,14 +354,12 @@ async function handleCommand(ctx, { cmd, args }) {
 bot.on('text', async (ctx, next) => {
   try {
     registerUser(ctx);
-    // menu trigger handled by bot.hears above
     // Only respond to valid prefix+command:
     const command = parseCommand(ctx.message.text);
     if (command) {
       let handled = await handleCommand(ctx, command);
-      if (handled) return;
-      // unknown command, show menu
-      await sendBanner(ctx, getMenu(ctx));
+      // If handled, DO NOT send the menu. If not handled, DO NOTHING.
+      return;
     }
     // else: do NOT reply!!
   } catch (_) {}
