@@ -1,15 +1,22 @@
 services:
-  - type: web
-    name: cybix-telegram-bot
-    env: node
-    plan: free
-    buildCommand: 'npm install'
-    startCommand: 'npm start'
-    envVars:
-      - key: BOT_TOKEN
-        sync: false
-      - key: OWNER_ID
-        sync: false
-      - key: PORT
-        value: 8080
-    autoDeploy: true
+- type: web
+  name: cybix-telegram-bot
+  env: node
+  plan: free
+  buildCommand: npm install
+  startCommand: npm start
+  envVars:
+    - key: BOT_TOKEN
+      sync: false
+    - key: OWNER_ID
+      sync: false
+    - key: TG_CHANNEL
+      sync: false
+    - key: TG_CHANNEL_USERNAME
+      sync: false
+    - key: WA_CHANNEL
+      sync: false
+    - key: BANNER_URL
+      sync: false
+    - key: BOT_NAME
+      sync: false
