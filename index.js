@@ -14,7 +14,7 @@ const bot = new Telegraf(BOT_TOKEN);
 const WHATSAPP_CHANNEL = "https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X";
 const TELEGRAM_CHANNEL = "https://t.me/cybixtech";
 const WEBSITE_LINK = "https://cybixtech.onrender.com";
-const BANNER_URL = "https://files.catbox.moe/nr1yiw.png";
+const BANNER_URL = "https://files.catbox.moe/qo8oso.jpg";
 
 // Session store (for multi-step flows)
 const sessions = {}; // user_id: { action, timestamp }
