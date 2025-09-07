@@ -11,8 +11,8 @@ const TG_CHANNEL = process.env.TG_CHANNEL || 't.me://cybixtech';
 const TG_CHANNEL_USERNAME = process.env.TG_CHANNEL_USERNAME || 'cybixtech';
 const WA_CHANNEL = process.env.WA_CHANNEL || 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
 const BANNER_URL = process.env.BANNER_URL || 'https://files.catbox.moe/2x9p8j.jpg';
+let BOT_NAME = process.env.BOT_NAME || 'CYBIX V1';
 const BOT_VERSION = '1.2.0';
-const BOT_NAME = process.env.BOT_NAME || 'CYBIX V1';
 let PREFIXES = ['.', '/'];
 
 if (!BOT_TOKEN || !OWNER_ID) throw new Error('Set BOT_TOKEN and OWNER_ID in .env');
@@ -183,7 +183,7 @@ bot.hears(/^([./])setbotname\s+(.+)/i, async (ctx) => {
   if (ctx.from.id.toString() !== OWNER_ID) return;
   const name = ctx.match[2].trim();
   if (!name) return sendBanner(ctx, '❌ Provide a new bot name.');
-  global.BOT_NAME = name;
+  BOT_NAME = name;
   await sendBanner(ctx, `✅ Bot name updated to: ${name}`);
 });
 
