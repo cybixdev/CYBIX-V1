@@ -7,15 +7,16 @@ const axios = require('axios');
 const path = require('path');
 const packageJson = require('./package.json');
 
-// === ENV ===
+// === CONFIG ===
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
 const PORT = process.env.PORT || 8080;
-const CHANNEL_LINK = 'https://t.me/cybixtech';
+const CHANNEL_LINK = 'https://t.me/cybixtech'; // Telegram channel link
+const CHANNEL_USERNAME = 'cybixtech'; // Channel username (no @)
+const WHATSAPP_LINK = 'https://wa.me/12094568317'; // WhatsApp group link
 const REPO_URL = 'https://github.com/Dev-Ops610/cybix-telegram-bot';
 const OWNER_TAG = '@cybixdev';
 
-// === CONFIG ===
 function getData() {
   try {
     return JSON.parse(fs.readFileSync('./data.json', 'utf8'));
@@ -37,7 +38,12 @@ function getUptime() {
 function getBannerAndButtons() {
   return {
     photo: getBanner(),
-    buttons: [[{ text: 'Telegram Channel', url: CHANNEL_LINK }]]
+    buttons: [
+      [
+        { text: 'Telegram Channel', url: CHANNEL_LINK },
+        { text: 'WhatsApp Group', url: WHATSAPP_LINK }
+      ]
+    ]
   };
 }
 
@@ -53,8 +59,12 @@ function saveUsers() {
 loadUsers();
 function saveUser(ctx) {
   if (!ctx.from) return;
-  if (!users.find(u => u.id === ctx.from.id)) {
+  const existing = users.find(u => u.id === ctx.from.id);
+  if (!existing) {
     users.push({ id: ctx.from.id, name: ctx.from.first_name || '', type: ctx.chat.type });
+    saveUsers();
+  } else if (existing.name !== ctx.from.first_name) {
+    existing.name = ctx.from.first_name || '';
     saveUsers();
   }
   if ((ctx.chat.type === 'group' || ctx.chat.type === 'supergroup' || ctx.chat.type === 'channel')) {
@@ -154,7 +164,38 @@ if (!BOT_TOKEN || !OWNER_ID) {
   process.exit(1);
 }
 const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 60_000 });
-bot.use(async (ctx, next) => { saveUser(ctx); return next(); });
+
+// === REQUIRE CHANNEL JOIN ===
+async function requireChannelJoin(ctx, next) {
+  // Only for private chats
+  if (!ctx.from || ctx.chat.type !== 'private') return next();
+  try {
+    const member = await ctx.telegram.getChatMember('@' + CHANNEL_USERNAME, ctx.from.id);
+    const allowed = ['member', 'administrator', 'creator'];
+    if (allowed.includes(member.status)) {
+      return next();
+    } else {
+      const { photo, buttons } = getBannerAndButtons();
+      await ctx.replyWithPhoto({ url: photo }, {
+        caption: `🚫 *Join our Telegram Channel to use this bot!*\n\n[Join Channel](${CHANNEL_LINK})\n\nAfter joining, press /start again.`,
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: buttons }
+      });
+      return;
+    }
+  } catch (e) {
+    const { photo, buttons } = getBannerAndButtons();
+    await ctx.replyWithPhoto({ url: photo }, {
+      caption: `🚫 *Join our Telegram Channel to use this bot!*\n\n[Join Channel](${CHANNEL_LINK})\n\nAfter joining, press /start again.`,
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: buttons }
+    });
+    return;
+  }
+}
+// === USER SESSION ===
+bot.use((ctx, next) => { saveUser(ctx); return next(); });
+bot.use(requireChannelJoin);
 
 // === MENU ===
 bot.hears(/^(\.|\/)(menu|start)$/i, async ctx => {
@@ -165,7 +206,7 @@ bot.hears(/^(\.|\/)(menu|start)$/i, async ctx => {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: buttons }
     });
-  } catch (e) { await ctx.reply(getMenu(ctx)); }
+  } catch { await ctx.reply(getMenu(ctx)); }
 });
 
 // === AI MENU ===
@@ -434,7 +475,7 @@ bot.hears(/^(\.|\/)broadcast\s+([\s\S]+)/i, async ctx => {
   ctx.reply("Broadcast started...");
   for (const u of users) {
     try {
-      await bot.telegram.sendMessage(u.id, msg, { parse_mode: 'Markdown' }).catch(()=>{});
+      await bot.telegram.sendMessage(u.id, msg, { parse_mode: 'Markdown' });
       ok++;
     } catch { fail++; }
   }
@@ -468,7 +509,7 @@ bot.hears(/^(\.|\/)setbotname\s+(.+)/i, async ctx => {
   } catch { await ctx.reply("Failed to update bot name."); }
 });
 
-// === Fallback for unrecognized commands
+// === FALLBACK for unknown commands
 bot.on('message', async ctx => {
   if (
     ctx.message &&
