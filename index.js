@@ -7,13 +7,13 @@ const axios = require('axios');
 const path = require('path');
 const packageJson = require('./package.json');
 
-// === CONFIG ===
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
 const PORT = process.env.PORT || 8080;
-const CHANNEL_LINK = 'https://t.me/cybixtech'; // Telegram channel link
-const CHANNEL_USERNAME = 'cybixtech'; // Channel username (no @)
-const WHATSAPP_LINK = 'https://wa.me/12094568317'; // WhatsApp group link
+
+const CHANNEL_LINK = 'https://t.me/cybixtech';
+const CHANNEL_USERNAME = 'cybixtech'; // without @
+const WHATSAPP_LINK = 'https://wa.me/12094568317';
 const REPO_URL = 'https://github.com/Dev-Ops610/cybix-telegram-bot';
 const OWNER_TAG = '@cybixdev';
 
@@ -47,7 +47,6 @@ function getBannerAndButtons() {
   };
 }
 
-// === USERS ===
 const USERS_FILE = path.join(__dirname, 'users.json');
 let users = [];
 function loadUsers() {
@@ -158,6 +157,23 @@ Powered by CYBIX DEVS`
   );
 }
 
+// UNIVERSAL SEND WITH BANNER AND BUTTONS
+async function sendWithBanner(ctx, caption, opts = {}) {
+  const { photo, buttons } = getBannerAndButtons();
+  try {
+    await ctx.replyWithPhoto({ url: photo }, {
+      caption,
+      parse_mode: opts.parse_mode || 'Markdown',
+      reply_markup: { inline_keyboard: buttons }
+    });
+  } catch (e) {
+    await ctx.reply(caption, {
+      parse_mode: opts.parse_mode || 'Markdown',
+      reply_markup: { inline_keyboard: buttons }
+    });
+  }
+}
+
 // === BOT INIT ===
 if (!BOT_TOKEN || !OWNER_ID) {
   console.error('BOT_TOKEN and OWNER_ID must be set in .env');
@@ -167,46 +183,24 @@ const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 60_000 });
 
 // === REQUIRE CHANNEL JOIN ===
 async function requireChannelJoin(ctx, next) {
-  // Only for private chats
   if (!ctx.from || ctx.chat.type !== 'private') return next();
   try {
     const member = await ctx.telegram.getChatMember('@' + CHANNEL_USERNAME, ctx.from.id);
     const allowed = ['member', 'administrator', 'creator'];
-    if (allowed.includes(member.status)) {
-      return next();
-    } else {
-      const { photo, buttons } = getBannerAndButtons();
-      await ctx.replyWithPhoto({ url: photo }, {
-        caption: `🚫 *Join our Telegram Channel to use this bot!*\n\n[Join Channel](${CHANNEL_LINK})\n\nAfter joining, press /start again.`,
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: buttons }
-      });
-      return;
-    }
+    if (allowed.includes(member.status)) return next();
+    await sendWithBanner(ctx, `🚫 *Join our Telegram Channel to use this bot!*\n\n[Join Channel](${CHANNEL_LINK})\n\nAfter joining, press /start again.`);
+    return;
   } catch (e) {
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: `🚫 *Join our Telegram Channel to use this bot!*\n\n[Join Channel](${CHANNEL_LINK})\n\nAfter joining, press /start again.`,
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
+    await sendWithBanner(ctx, `🚫 *Join our Telegram Channel to use this bot!*\n\n[Join Channel](${CHANNEL_LINK})\n\nAfter joining, press /start again.`);
     return;
   }
 }
-// === USER SESSION ===
 bot.use((ctx, next) => { saveUser(ctx); return next(); });
 bot.use(requireChannelJoin);
 
 // === MENU ===
 bot.hears(/^(\.|\/)(menu|start)$/i, async ctx => {
-  try {
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: getMenu(ctx),
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply(getMenu(ctx)); }
+  await sendWithBanner(ctx, getMenu(ctx));
 });
 
 // === AI MENU ===
@@ -216,17 +210,22 @@ const aiApi = "https://api.princetechn.com/api/ai";
     try {
       const q = ctx.match[2];
       const { data } = await axios.get(`${aiApi}/${cmd}?apikey=prince&text=${encodeURIComponent(q)}`);
-      await ctx.reply(data.result || "No result.");
-    } catch { await ctx.reply("API error!"); }
+      await sendWithBanner(ctx, data.result || "No result.");
+    } catch { await sendWithBanner(ctx, "API error!"); }
   });
 });
 bot.hears(/^(\.|\/)text2img\s+(.+)/i, async ctx => {
   try {
     const prompt = ctx.match[2];
     const { data } = await axios.get(`${aiApi}/text2img?apikey=prince&prompt=${encodeURIComponent(prompt)}`);
-    if (data.result) await ctx.replyWithPhoto({ url: data.result });
-    else await ctx.reply("No image.");
-  } catch { await ctx.reply("API error!"); }
+    if (data.result) {
+      await ctx.replyWithPhoto({ url: data.result }, {
+        caption: `Here is your image!\n\n${prompt}`,
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
+      });
+    } else await sendWithBanner(ctx, "No image.");
+  } catch { await sendWithBanner(ctx, "API error!"); }
 });
 
 // === DL MENU ===
@@ -244,21 +243,16 @@ Object.entries(dlCmds).forEach(([cmd, url])=>{
     try {
       const q = ctx.match[2];
       const { data } = await axios.get(`${dlApi}/${url}${encodeURIComponent(q)}`);
-      const { photo, buttons } = getBannerAndButtons();
       if(cmd==='play' && data.result) {
         await ctx.replyWithAudio({ url: data.result }, {
           caption: `*Play*\n${data.result}`,
           parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: buttons }
+          reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
         });
       } else {
-        await ctx.replyWithPhoto({ url: photo }, {
-          caption: data.result ? `*${cmd.charAt(0).toUpperCase()+cmd.slice(1)}*\n${data.result}` : `No result.`,
-          parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: buttons }
-        });
+        await sendWithBanner(ctx, data.result ? `*${cmd.charAt(0).toUpperCase()+cmd.slice(1)}*\n${data.result}` : `No result.`);
       }
-    } catch { await ctx.reply("API error!"); }
+    } catch { await sendWithBanner(ctx, "API error!"); }
   });
 });
 
@@ -269,92 +263,119 @@ bot.hears(/^(\.|\/)trivia$/i, async ctx => {
     const q = res.data.results[0];
     const options = [q.correct_answer, ...q.incorrect_answers].sort(() => Math.random() - 0.5);
     ctx.session = ctx.session || {}; ctx.session.trivia = q.correct_answer;
-    ctx.replyWithMarkdown(`*Trivia:*\n${q.question}\nOptions: ${options.map((x,i)=>`\n${i+1}. ${x}`).join('')}\nReply with .answer [number]`);
-  } catch { ctx.reply("Trivia error."); }
+    await sendWithBanner(ctx, `*Trivia:*\n${q.question}\nOptions: ${options.map((x,i)=>`\n${i+1}. ${x}`).join('')}\nReply with .answer [number]`);
+  } catch { await sendWithBanner(ctx, "Trivia error."); }
 });
 bot.hears(/^(\.|\/)answer\s+(.+)/i, async ctx => {
   if (ctx.session && ctx.session.trivia) {
     if (ctx.match[2].toLowerCase() === ctx.session.trivia.toLowerCase()) {
-      ctx.reply("Correct!");
-    } else ctx.reply("Wrong!");
+      await sendWithBanner(ctx,"Correct!");
+    } else await sendWithBanner(ctx,"Wrong!");
     delete ctx.session.trivia;
   }
 });
 bot.hears(/^(\.|\/)mathquiz$/i, async ctx => {
   const a = Math.floor(Math.random()*20)+1, b = Math.floor(Math.random()*20)+1;
   ctx.session = ctx.session || {}; ctx.session.math = a+b;
-  ctx.reply(`What is ${a} + ${b}? Reply with .mathans [answer]`);
+  await sendWithBanner(ctx,`What is ${a} + ${b}? Reply with .mathans [answer]`);
 });
 bot.hears(/^(\.|\/)mathans\s+(\d+)/i, async ctx => {
   if (ctx.session && ctx.session.math !== undefined) {
-    if (parseInt(ctx.match[2]) === ctx.session.math) ctx.reply("Correct!");
-    else ctx.reply("Wrong!");
+    if (parseInt(ctx.match[2]) === ctx.session.math) await sendWithBanner(ctx,"Correct!");
+    else await sendWithBanner(ctx,"Wrong!");
     delete ctx.session.math;
   }
 });
 bot.hears(/^(\.|\/)8ball\s+(.+)/i, async ctx => {
   try {
     const res = await axios.get('https://8ball.delegator.com/magic/JSON/' + encodeURIComponent(ctx.match[2]));
-    ctx.reply(res.data.magic.answer);
-  } catch { ctx.reply("API error!"); }
+    await sendWithBanner(ctx,res.data.magic.answer);
+  } catch { await sendWithBanner(ctx,"API error!"); }
 });
 
 // === HENTAI MENU ===
 bot.hears(/^(\.|\/)hentai$/i, async ctx => {
   try {
     const res = await axios.get('https://nekos.best/api/v2/hentai');
-    await ctx.replyWithPhoto({ url: res.data.results[0].url });
-  } catch { await ctx.reply("API error!"); }
+    await ctx.replyWithPhoto({ url: res.data.results[0].url }, {
+      caption: 'Hentai',
+      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
+    });
+  } catch { await sendWithBanner(ctx,"API error!"); }
 });
 bot.hears(/^(\.|\/)hentai_gif$/i, async ctx => {
   try {
     const res = await axios.get('https://nekos.life/api/v2/img/Random_hentai_gif');
-    await ctx.replyWithAnimation({ url: res.data.url });
-  } catch { await ctx.reply("API error!"); }
+    await ctx.replyWithAnimation({ url: res.data.url }, {
+      caption: 'Hentai GIF',
+      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
+    });
+  } catch { await sendWithBanner(ctx,"API error!"); }
 });
 bot.hears(/^(\.|\/)waifu$/i, async ctx => {
   try {
     const res = await axios.get('https://nekos.best/api/v2/waifu');
-    await ctx.replyWithPhoto({ url: res.data.results[0].url });
-  } catch { await ctx.reply("API error!"); }
+    await ctx.replyWithPhoto({ url: res.data.results[0].url }, {
+      caption: 'Waifu',
+      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
+    });
+  } catch { await sendWithBanner(ctx,"API error!"); }
 });
 bot.hears(/^(\.|\/)neko$/i, async ctx => {
   try {
     const res = await axios.get('https://nekos.best/api/v2/neko');
-    await ctx.replyWithPhoto({ url: res.data.results[0].url });
-  } catch { await ctx.reply("API error!"); }
+    await ctx.replyWithPhoto({ url: res.data.results[0].url }, {
+      caption: 'Neko',
+      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
+    });
+  } catch { await sendWithBanner(ctx,"API error!"); }
 });
 
 // === PORN MENU ===
 bot.hears(/^(\.|\/)porn$/i, async ctx => {
   try {
     const res = await axios.get('https://nekos.life/api/v2/img/pussy');
-    await ctx.replyWithPhoto({ url: res.data.url });
-  } catch { await ctx.reply("API error!"); }
+    await ctx.replyWithPhoto({ url: res.data.url }, {
+      caption: 'Porn',
+      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
+    });
+  } catch { await sendWithBanner(ctx,"API error!"); }
 });
 bot.hears(/^(\.|\/)ass$/i, async ctx => {
   try {
     const res = await axios.get('https://nekos.life/api/v2/img/anal');
-    await ctx.replyWithPhoto({ url: res.data.url });
-  } catch { await ctx.reply("API error!"); }
+    await ctx.replyWithPhoto({ url: res.data.url }, {
+      caption: 'Ass',
+      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
+    });
+  } catch { await sendWithBanner(ctx,"API error!"); }
 });
 bot.hears(/^(\.|\/)boobs$/i, async ctx => {
   try {
     const res = await axios.get('https://nekos.life/api/v2/img/boobs');
-    await ctx.replyWithPhoto({ url: res.data.url });
-  } catch { await ctx.reply("API error!"); }
+    await ctx.replyWithPhoto({ url: res.data.url }, {
+      caption: 'Boobs',
+      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
+    });
+  } catch { await sendWithBanner(ctx,"API error!"); }
 });
 bot.hears(/^(\.|\/)blowjob$/i, async ctx => {
   try {
     const res = await axios.get('https://nekos.life/api/v2/img/blowjob');
-    await ctx.replyWithPhoto({ url: res.data.url });
-  } catch { await ctx.reply("API error!"); }
+    await ctx.replyWithPhoto({ url: res.data.url }, {
+      caption: 'Blowjob',
+      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
+    });
+  } catch { await sendWithBanner(ctx,"API error!"); }
 });
 bot.hears(/^(\.|\/)cum$/i, async ctx => {
   try {
     const res = await axios.get('https://nekos.life/api/v2/img/cum');
-    await ctx.replyWithPhoto({ url: res.data.url });
-  } catch { await ctx.reply("API error!"); }
+    await ctx.replyWithPhoto({ url: res.data.url }, {
+      caption: 'Cum',
+      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
+    });
+  } catch { await sendWithBanner(ctx,"API error!"); }
 });
 
 // === ADULT MENU ===
@@ -363,123 +384,73 @@ bot.hears(/^(\.|\/)xvideosearch\s+(.+)/i, async ctx => {
   try {
     const res = await axios.get(`${adultApi}/search/xvideossearch?apikey=prince&query=${encodeURIComponent(ctx.match[2])}`);
     const links = (res.data.result || []).slice(0, 5).join('\n') || "No results.";
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: `*Xvideos Results*\n${links}`,
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply('API error!'); }
+    await sendWithBanner(ctx, `*Xvideos Results*\n${links}`);
+  } catch { await sendWithBanner(ctx,'API error!'); }
 });
 bot.hears(/^(\.|\/)xnxxsearch\s+(.+)/i, async ctx => {
   try {
     const res = await axios.get(`${adultApi}/search/xnxxsearch?apikey=prince&query=${encodeURIComponent(ctx.match[2])}`);
     const links = (res.data.result || []).slice(0, 5).join('\n') || "No results.";
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: `*XNXX Results*\n${links}`,
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply('API error!'); }
+    await sendWithBanner(ctx, `*XNXX Results*\n${links}`);
+  } catch { await sendWithBanner(ctx,'API error!'); }
 });
 bot.hears(/^(\.|\/)dl-xnxx\s+(.+)/i, async ctx => {
   try {
     const res = await axios.get(`${adultApi}/download/xnxxdl?apikey=prince&url=${encodeURIComponent(ctx.match[2])}`);
     const vid = res.data.result || res.data.url || '';
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: vid ? `*XNXX Download*\n${vid}` : "No video found.",
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply('API error!'); }
+    await sendWithBanner(ctx, vid ? `*XNXX Download*\n${vid}` : "No video found.");
+  } catch { await sendWithBanner(ctx,'API error!'); }
 });
 bot.hears(/^(\.|\/)dl-xvideo\s+(.+)/i, async ctx => {
   try {
     const res = await axios.get(`${adultApi}/download/xvideosdl?apikey=prince&url=${encodeURIComponent(ctx.match[2])}`);
     const vid = res.data.result || res.data.url || '';
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: vid ? `*Xvideos Download*\n${vid}` : "No video found.",
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply('API error!'); }
+    await sendWithBanner(ctx, vid ? `*Xvideos Download*\n${vid}` : "No video found.");
+  } catch { await sendWithBanner(ctx,'API error!'); }
 });
 
 // === OTHER MENU ===
 bot.hears(/^(\.|\/)repo$/i, async ctx => {
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: `*Bot Repo:*\n${REPO_URL}`,
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
+  await sendWithBanner(ctx, `*Bot Repo:*\n${REPO_URL}`);
 });
 bot.hears(/^(\.|\/)ping$/i, async ctx => {
   const start = Date.now();
   const sent = await ctx.reply('Pinging...');
   const ms = Date.now() - start;
   await ctx.deleteMessage(sent.message_id).catch(() => {});
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: `*Ping*: ${ms}ms`,
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
+  await sendWithBanner(ctx, `*Ping*: ${ms}ms`);
 });
 bot.hears(/^(\.|\/)runtime$/i, async ctx => {
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: `*Bot Uptime*\n${getUptime()}`,
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
+  await sendWithBanner(ctx, `*Bot Uptime*\n${getUptime()}`);
 });
 
 // === DEV MENU ===
 bot.hears(/^(\.|\/)statics$/i, async ctx => {
   const cpus = os.cpus().length;
   const mem = (os.totalmem() / 1024 / 1024).toFixed(0) + "MB";
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: `*Statics*\nCPU Cores: ${cpus}\nTotal Mem: ${mem}`,
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
+  await sendWithBanner(ctx, `*Statics*\nCPU Cores: ${cpus}\nTotal Mem: ${mem}`);
 });
 bot.hears(/^(\.|\/)listusers$/i, async ctx => {
   if (!isOwner(ctx)) return;
-  const { photo, buttons } = getBannerAndButtons();
   const list = users.map(u => `${u.name} (${u.id})`).join('\n') || "No users found.";
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: `*User List*\n${list}`,
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
+  await sendWithBanner(ctx, `*User List*\n${list}`);
 });
 bot.hears(/^(\.|\/)logs$/i, async ctx => {
   if (!isOwner(ctx)) return;
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: "*Logs*\nNo logs implemented (dev only).",
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
+  await sendWithBanner(ctx, "*Logs*\nNo logs implemented (dev only).");
 });
 bot.hears(/^(\.|\/)broadcast\s+([\s\S]+)/i, async ctx => {
-  if (!isOwner(ctx)) return ctx.reply("Not authorized.");
+  if (!isOwner(ctx)) return sendWithBanner(ctx,"Not authorized.");
   const msg = ctx.match[2];
   let ok = 0, fail = 0;
-  ctx.reply("Broadcast started...");
+  await sendWithBanner(ctx, "Broadcast started...");
   for (const u of users) {
     try {
-      await bot.telegram.sendMessage(u.id, msg, { parse_mode: 'Markdown' });
+      await bot.telegram.sendMessage(u.id, msg, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: getBannerAndButtons().buttons } });
       ok++;
     } catch { fail++; }
   }
-  ctx.reply(`Broadcast finished!\nSuccess: ${ok}\nFailed: ${fail}`);
+  await sendWithBanner(ctx, `Broadcast finished!\nSuccess: ${ok}\nFailed: ${fail}`);
 });
 bot.hears(/^(\.|\/)setbanner\s+(.+)/i, async ctx => {
   if (!isOwner(ctx)) return;
@@ -487,8 +458,8 @@ bot.hears(/^(\.|\/)setbanner\s+(.+)/i, async ctx => {
     let data = getData();
     data.banner = ctx.match[2];
     fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
-    await ctx.reply("Banner updated (affects new menu replies).");
-  } catch { await ctx.reply("Failed to update banner."); }
+    await sendWithBanner(ctx, "Banner updated (affects new menu replies).");
+  } catch { await sendWithBanner(ctx, "Failed to update banner."); }
 });
 bot.hears(/^(\.|\/)setprefix\s+(.+)/i, async ctx => {
   if (!isOwner(ctx)) return;
@@ -496,8 +467,8 @@ bot.hears(/^(\.|\/)setprefix\s+(.+)/i, async ctx => {
     let data = getData();
     data.prefix = ctx.match[2].split(' ').filter(Boolean);
     fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
-    await ctx.reply(`Prefix updated to: ${data.prefix.join(' ')}`);
-  } catch { await ctx.reply("Failed to update prefix."); }
+    await sendWithBanner(ctx, `Prefix updated to: ${data.prefix.join(' ')}`);
+  } catch { await sendWithBanner(ctx, "Failed to update prefix."); }
 });
 bot.hears(/^(\.|\/)setbotname\s+(.+)/i, async ctx => {
   if (!isOwner(ctx)) return;
@@ -505,25 +476,18 @@ bot.hears(/^(\.|\/)setbotname\s+(.+)/i, async ctx => {
     let data = getData();
     data.botName = ctx.match[2];
     fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
-    await ctx.reply(`Bot name updated to: ${data.botName}`);
-  } catch { await ctx.reply("Failed to update bot name."); }
+    await sendWithBanner(ctx, `Bot name updated to: ${data.botName}`);
+  } catch { await sendWithBanner(ctx, "Failed to update bot name."); }
 });
 
-// === FALLBACK for unknown commands
+// === FALLBACK for unknown commands ===
 bot.on('message', async ctx => {
   if (
     ctx.message &&
     typeof ctx.message.text === 'string' &&
     (ctx.message.text.startsWith('.') || ctx.message.text.startsWith('/'))
   ) {
-    try {
-      const { photo, buttons } = getBannerAndButtons();
-      await ctx.replyWithPhoto({ url: photo }, {
-        caption: getMenu(ctx),
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: buttons }
-      });
-    } catch { await ctx.reply(getMenu(ctx)); }
+    await sendWithBanner(ctx, getMenu(ctx));
   }
 });
 
