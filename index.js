@@ -11,22 +11,24 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
 const PORT = process.env.PORT || 8080;
 
-const CHANNEL_LINK = 'https://t.me/cybixtech';
+const CHANNEL_LINK = 't.me://cybixtech';
 const CHANNEL_USERNAME = 'cybixtech'; // without @
-const WHATSAPP_LINK = 'https://wa.me/12094568317';
+const WHATSAPP_LINK = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
 const REPO_URL = 'https://github.com/Dev-Ops610/cybix-telegram-bot';
 const OWNER_TAG = '@cybixdev';
+
+const BANNER_URL = 'https://files.catbox.moe/2x9p8j.jpg';
 
 function getData() {
   try {
     return JSON.parse(fs.readFileSync('./data.json', 'utf8'));
   } catch {
-    return { prefix: [".", "/"], botName: "CYBIX V1", banner: "https://files.catbox.moe/7dozqn.jpg" };
+    return { prefix: [".", "/"], botName: "CYBIX V1", banner: BANNER_URL };
   }
 }
 function getBotName() { return getData().botName || 'CYBIX V1'; }
 function getPrefix() { return Array.isArray(getData().prefix) ? getData().prefix.join(' ') : getData().prefix || ". /"; }
-function getBanner() { return getData().banner || "https://files.catbox.moe/7dozqn.jpg"; }
+function getBanner() { return getData().banner || BANNER_URL; }
 function getVersion() { return packageJson.version || '2.0.0'; }
 function getUptime() {
   const uptime = process.uptime();
@@ -36,13 +38,12 @@ function getUptime() {
   return `${h}h ${m}m ${s}s`;
 }
 function getBannerAndButtons() {
+  // Buttons stacked vertically, one on top, one on bottom
   return {
     photo: getBanner(),
     buttons: [
-      [
-        { text: 'Telegram Channel', url: CHANNEL_LINK },
-        { text: 'WhatsApp Group', url: WHATSAPP_LINK }
-      ]
+      [{ text: 'Telegram Channel', url: CHANNEL_LINK }],
+      [{ text: 'WhatsApp Channel', url: WHATSAPP_LINK }]
     ]
   };
 }
@@ -115,13 +116,6 @@ function getMenu(ctx) {
 ┃ • .8ball <q>
 ╰━━━━━━━━━━━━━━━
 
-╭━━【 𝐇𝐄𝐍𝐓𝐀𝐈 𝐌𝐄𝐍𝐔 】━━
-┃ • .hentai
-┃ • .hentai_gif
-┃ • .waifu
-┃ • .neko
-╰━━━━━━━━━━━━━━━
-
 ╭━━【 𝐏𝐎𝐑𝐍 𝐌𝐄𝐍𝐔 】━━
 ┃ • .porn
 ┃ • .ass
@@ -134,13 +128,6 @@ function getMenu(ctx) {
 ┃ • .repo
 ┃ • .ping
 ┃ • .runtime
-╰━━━━━━━━━━━━━━━
-
-╭━━【 𝐀𝐃𝐔𝐋𝐓 𝐌𝐄𝐍𝐔 】━━
-┃ • .xvideosearch <q>
-┃ • .xnxxsearch <q>
-┃ • .dl-xnxx <url>
-┃ • .dl-xvideo <url>
 ╰━━━━━━━━━━━━━━━
 
 ╭━━【𝐃𝐄𝐕 𝐌𝐄𝐍𝐔】━━
@@ -293,44 +280,6 @@ bot.hears(/^(\.|\/)8ball\s+(.+)/i, async ctx => {
   } catch { await sendWithBanner(ctx,"API error!"); }
 });
 
-// === HENTAI MENU ===
-bot.hears(/^(\.|\/)hentai$/i, async ctx => {
-  try {
-    const res = await axios.get('https://nekos.best/api/v2/hentai');
-    await ctx.replyWithPhoto({ url: res.data.results[0].url }, {
-      caption: 'Hentai',
-      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
-    });
-  } catch { await sendWithBanner(ctx,"API error!"); }
-});
-bot.hears(/^(\.|\/)hentai_gif$/i, async ctx => {
-  try {
-    const res = await axios.get('https://nekos.life/api/v2/img/Random_hentai_gif');
-    await ctx.replyWithAnimation({ url: res.data.url }, {
-      caption: 'Hentai GIF',
-      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
-    });
-  } catch { await sendWithBanner(ctx,"API error!"); }
-});
-bot.hears(/^(\.|\/)waifu$/i, async ctx => {
-  try {
-    const res = await axios.get('https://nekos.best/api/v2/waifu');
-    await ctx.replyWithPhoto({ url: res.data.results[0].url }, {
-      caption: 'Waifu',
-      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
-    });
-  } catch { await sendWithBanner(ctx,"API error!"); }
-});
-bot.hears(/^(\.|\/)neko$/i, async ctx => {
-  try {
-    const res = await axios.get('https://nekos.best/api/v2/neko');
-    await ctx.replyWithPhoto({ url: res.data.results[0].url }, {
-      caption: 'Neko',
-      reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
-    });
-  } catch { await sendWithBanner(ctx,"API error!"); }
-});
-
 // === PORN MENU ===
 bot.hears(/^(\.|\/)porn$/i, async ctx => {
   try {
@@ -376,37 +325,6 @@ bot.hears(/^(\.|\/)cum$/i, async ctx => {
       reply_markup: { inline_keyboard: getBannerAndButtons().buttons }
     });
   } catch { await sendWithBanner(ctx,"API error!"); }
-});
-
-// === ADULT MENU ===
-const adultApi = "https://api.princetechn.com/api";
-bot.hears(/^(\.|\/)xvideosearch\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get(`${adultApi}/search/xvideossearch?apikey=prince&query=${encodeURIComponent(ctx.match[2])}`);
-    const links = (res.data.result || []).slice(0, 5).join('\n') || "No results.";
-    await sendWithBanner(ctx, `*Xvideos Results*\n${links}`);
-  } catch { await sendWithBanner(ctx,'API error!'); }
-});
-bot.hears(/^(\.|\/)xnxxsearch\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get(`${adultApi}/search/xnxxsearch?apikey=prince&query=${encodeURIComponent(ctx.match[2])}`);
-    const links = (res.data.result || []).slice(0, 5).join('\n') || "No results.";
-    await sendWithBanner(ctx, `*XNXX Results*\n${links}`);
-  } catch { await sendWithBanner(ctx,'API error!'); }
-});
-bot.hears(/^(\.|\/)dl-xnxx\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get(`${adultApi}/download/xnxxdl?apikey=prince&url=${encodeURIComponent(ctx.match[2])}`);
-    const vid = res.data.result || res.data.url || '';
-    await sendWithBanner(ctx, vid ? `*XNXX Download*\n${vid}` : "No video found.");
-  } catch { await sendWithBanner(ctx,'API error!'); }
-});
-bot.hears(/^(\.|\/)dl-xvideo\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get(`${adultApi}/download/xvideosdl?apikey=prince&url=${encodeURIComponent(ctx.match[2])}`);
-    const vid = res.data.result || res.data.url || '';
-    await sendWithBanner(ctx, vid ? `*Xvideos Download*\n${vid}` : "No video found.");
-  } catch { await sendWithBanner(ctx,'API error!'); }
 });
 
 // === OTHER MENU ===
