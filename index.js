@@ -1,451 +1,159 @@
 require('dotenv').config();
-const { Telegraf } = require('telegraf');
-const express = require('express');
-const fs = require('fs');
-const os = require('os');
+const { Telegraf, Markup } = require('telegraf');
 const axios = require('axios');
-const path = require('path');
-const packageJson = require('./package.json');
+const moment = require('moment');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
-const PORT = process.env.PORT || 8080;
-const CHANNEL_LINK = 'https://t.me/cybixtech';
-const REPO_URL = 'https://github.com/Dev-Ops610/cybix-telegram-bot';
-const OWNER_TAG = '@cybixdev';
+const API_URL = process.env.API_URL;
+const CODE_EXPIRY_MINUTES = 3;
 
-// Dynamic Config
-function getData() {
-  try {
-    return JSON.parse(fs.readFileSync('./data.json', 'utf8'));
-  } catch {
-    return { prefix: [".", "/"], botName: "CYBIX V1", banner: "https://files.catbox.moe/7dozqn.jpg" };
-  }
-}
-function getBotName() { return getData().botName || 'CYBIX V1'; }
-function getPrefix() { return Array.isArray(getData().prefix) ? getData().prefix.join(' ') : getData().prefix || ". /"; }
-function getBanner() { return getData().banner || "https://files.catbox.moe/7dozqn.jpg"; }
-function getVersion() { return packageJson.version || '2.0.0'; }
-function getUptime() {
-  const uptime = process.uptime();
-  const h = Math.floor(uptime / 3600);
-  const m = Math.floor((uptime % 3600) / 60);
-  const s = Math.floor(uptime % 60);
-  return `${h}h ${m}m ${s}s`;
-}
-function getBannerAndButtons() {
-  return {
-    photo: getBanner(),
-    buttons: [[{ text: 'Telegram Channel', url: CHANNEL_LINK }]]
-  };
+const bot = new Telegraf(BOT_TOKEN);
+
+// Channel/website links
+const WHATSAPP_CHANNEL = "https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X";
+const TELEGRAM_CHANNEL = "https://t.me/cybixtech";
+const WEBSITE_LINK = "https://cybixtech.onrender.com";
+const BANNER_URL = "https://files.catbox.moe/p6f8el.jpg";
+
+// Session store (for multi-step flows)
+const sessions = {}; // user_id: { action, timestamp }
+
+function channelButtons() {
+  return Markup.inlineKeyboard([
+    [Markup.button.url('WhatsApp Channel', WHATSAPP_CHANNEL)],
+    [Markup.button.url('Telegram Channel', TELEGRAM_CHANNEL)],
+    [Markup.button.url('CYBIX TECH Website', WEBSITE_LINK)]
+  ]);
 }
 
-// User Tracking
-const USERS_FILE = path.join(__dirname, 'users.json');
-let users = [];
-try { users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); } catch { users = []; }
-function saveUser(ctx) {
-  if (!ctx.from) return;
-  if (!users.find(u => u.id === ctx.from.id)) {
-    users.push({ id: ctx.from.id, name: ctx.from.first_name || '' });
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-  }
-}
 function isOwner(ctx) {
-  return ctx.from && ctx.from.id.toString() === OWNER_ID.toString();
-}
-function getMenu(ctx) {
-  return (
-`╭━───〔 ${getBotName()} 〕───━━╮
-│ ✦ Prefix : ${getPrefix()}
-│ ✦ Owner : ${OWNER_TAG}
-│ ✦ User : ${ctx.from?.first_name || '-'}
-│ ✦ User ID : ${ctx.from?.id || '-'}
-│ ✦ Users : ${users.length}
-│ ✦ Speed : ${Math.floor(Math.random() * 10 + 1)}ms
-│ ✦ Status : Online
-│ ✦ Uptime : ${getUptime()}
-│ ✦ Version : ${getVersion()}
-│ ✦ RAM : ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)}MB
-╰───────────────────╯
-
-╭━━【 𝐀𝐈 𝐌𝐄𝐍𝐔 】━━
-┃ • .chatgpt <q>
-┃ • .openai <q>
-┃ • .blackbox <q>
-┃ • .gemini <q>
-┃ • .deepseek <q>
-┃ • .text2img <prompt>
-╰━━━━━━━━━━━━━━━
-
-╭━━【 𝐃𝐋 𝐌𝐄𝐍𝐔 】━━
-┃ • .apk <app>
-┃ • .spotify <url>
-┃ • .gitclone <url>
-┃ • .mediafire <url>
-┃ • .play <yt>
-┃ • .gdrive <url>
-╰━━━━━━━━━━━━━━━
-
-╭━━【 𝐆𝐀𝐌𝐄 𝐌𝐄𝐍𝐔 】━━
-┃ • .tictactoe @user
-┃ • .rps @user
-┃ • .trivia
-┃ • .mathquiz
-┃ • .8ball <q>
-╰━━━━━━━━━━━━━━━
-
-╭━━【 𝐎𝐓𝐇𝐄𝐑 𝐌𝐄𝐍𝐔 】━━
-┃ • .repo
-┃ • .ping
-┃ • .runtime
-╰━━━━━━━━━━━━━━━
-
-╭━━【 𝐀𝐃𝐔𝐋𝐓 𝐌𝐄𝐍𝐔 】━━
-┃ • .xvideosearch <q>
-┃ • .xnxxsearch <q>
-┃ • .dl-xnxx <url>
-┃ • .dl-xvideo <url>
-╰━━━━━━━━━━━━━━━
-
-╭━━【𝐃𝐄𝐕 𝐌𝐄𝐍𝐔】━━
-┃ • .statics
-┃ • .listusers
-┃ • .logs
-┃ • .setbanner <url>
-┃ • .setprefix <pfx>
-┃ • .setbotname <name>
-╰━━━━━━━━━━━━━━━
-
-Powered by CYBIX DEVS`
-  );
+  return String(ctx.from.id) === String(OWNER_ID);
 }
 
-// Init Bot
-const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 60_000 });
-bot.use(async (ctx, next) => { saveUser(ctx); return next(); });
+// Helper: Generate random 6-char code
+function generateCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
 
-// === Menu command
-bot.hears(/^(\.|\/)(menu|start)$/i, async ctx => {
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: getMenu(ctx),
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
-});
+// Send banner and buttons
+async function sendBanner(ctx, text) {
+  try {
+    await ctx.replyWithPhoto(BANNER_URL, {
+      caption: text,
+      ...channelButtons()
+    });
+  } catch {
+    await ctx.reply(text, channelButtons());
+  }
+}
 
-// === AI MENU ===
-bot.hears(/^(\.|\/)chatgpt\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/ai/chatgpt?apikey=prince&text=" + encodeURIComponent(ctx.match[2]));
-    await ctx.reply(res.data.result || "No result.");
-  } catch { await ctx.reply("API error!"); }
-});
-bot.hears(/^(\.|\/)openai\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/ai/openai?apikey=prince&text=" + encodeURIComponent(ctx.match[2]));
-    await ctx.reply(res.data.result || "No result.");
-  } catch { await ctx.reply("API error!"); }
-});
-bot.hears(/^(\.|\/)blackbox\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/ai/blackbox?apikey=prince&text=" + encodeURIComponent(ctx.match[2]));
-    await ctx.reply(res.data.result || "No result.");
-  } catch { await ctx.reply("API error!"); }
-});
-bot.hears(/^(\.|\/)gemini\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/ai/gemini?apikey=prince&text=" + encodeURIComponent(ctx.match[2]));
-    await ctx.reply(res.data.result || "No result.");
-  } catch { await ctx.reply("API error!"); }
-});
-bot.hears(/^(\.|\/)deepseek\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/ai/deepseek?apikey=prince&text=" + encodeURIComponent(ctx.match[2]));
-    await ctx.reply(res.data.result || "No result.");
-  } catch { await ctx.reply("API error!"); }
-});
-bot.hears(/^(\.|\/)text2img\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/ai/text2img?apikey=prince&prompt=" + encodeURIComponent(ctx.match[2]));
-    if (res.data.result) await ctx.replyWithPhoto({ url: res.data.result });
-    else await ctx.reply("No image.");
-  } catch { await ctx.reply("API error!"); }
+// Start/menu
+bot.start(async (ctx) => {
+  await sendBanner(ctx, `👋 Welcome to CYBIX TECH Bot!
+What do you want to do?
+1️⃣ Sign Up (/signup)
+2️⃣ Forgot Password (/forgot)
+💎 Premium info (/premium)
+/help for all commands.`);
 });
 
-// === DL MENU ===
-bot.hears(/^(\.|\/)apk\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/download/apkdl?apikey=prince&appName=" + encodeURIComponent(ctx.match[2]));
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: res.data.result ? `*APK Download*\n${res.data.result}` : "No APK found.",
-      parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply("API error!"); }
+// Help
+bot.help(async (ctx) => {
+  await ctx.reply(`🚀 CYBIX TECH Bot Commands:
+/signup - Get sign-up code
+/forgot - Reset password
+/premium - Premium info
+/addprem <email> - Owner only: add premium
+/help - Show help`);
+  await sendBanner(ctx, 'Quick links:');
 });
-bot.hears(/^(\.|\/)spotify\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/download/spotifydlv2?apikey=prince&url=" + encodeURIComponent(ctx.match[2]));
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: res.data.result ? `*Spotify Download*\n${res.data.result}` : "Track not found.",
-      parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply("API error!"); }
+
+// /signup - sign-up code flow
+bot.command('signup', async (ctx) => {
+  sessions[ctx.from.id] = { action: 'signup', timestamp: Date.now() };
+  await ctx.reply('🔒 Enter your email for sign-up:');
 });
-bot.hears(/^(\.|\/)gitclone\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/download/gitclone?apikey=prince&url=" + encodeURIComponent(ctx.match[2]));
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: res.data.result ? `*Git Clone*\n${res.data.result}` : "Clone failed.",
-      parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply("API error!"); }
+
+// /forgot - password reset flow
+bot.command('forgot', async (ctx) => {
+  sessions[ctx.from.id] = { action: 'forgot', timestamp: Date.now() };
+  await ctx.reply('🔑 Enter your registered email to reset password:');
 });
-bot.hears(/^(\.|\/)mediafire\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/download/mediafire?apikey=prince&url=" + encodeURIComponent(ctx.match[2]));
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: res.data.result ? `*Mediafire Download*\n${res.data.result}` : "Mediafire file not found.",
-      parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply("API error!"); }
+
+// /premium - info & contact owner
+bot.command('premium', async (ctx) => {
+  await sendBanner(ctx, `💎 Premium lets you upload ZIP/files, batch obfuscate/deobfuscate.
+Contact @cybixdev to buy premium. Owner will activate for 1 month.`);
 });
-bot.hears(/^(\.|\/)play\s+(.+)/i, async ctx => {
+
+// /addprem <email> - owner only
+bot.command('addprem', async (ctx) => {
+  if (!isOwner(ctx)) return ctx.reply('❌ Only owner can use this.');
+  const args = ctx.message.text.split(' ');
+  if (args.length < 2) return ctx.reply('Usage: /addprem <email>');
+  const email = args[1].trim().toLowerCase();
   try {
-    const res = await axios.get("https://api.princetechn.com/api/download/ytmp3?apikey=prince&url=" + encodeURIComponent(ctx.match[2]));
-    const audioUrl = res.data.result;
-    const { photo, buttons } = getBannerAndButtons();
-    if (audioUrl) {
-      await ctx.replyWithAudio({ url: audioUrl }, {
-        caption: `*Play*\n${audioUrl}`,
-        parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons }
-      });
-    } else {
-      await ctx.replyWithPhoto({ url: photo }, {
-        caption: "No audio found.",
-        parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons }
-      });
+    await axios.post(`${API_URL}/admin/add-premium`, { email });
+    await ctx.reply(`✅ Premium added for ${email}.`);
+  } catch (e) {
+    await ctx.reply('❌ Failed to add premium. Check API or email.');
+  }
+});
+
+// Handle text for signup/forgot flows
+bot.on('text', async (ctx) => {
+  const session = sessions[ctx.from.id];
+  if (!session || !session.action) return;
+  const email = ctx.message.text.trim().toLowerCase();
+  
+  // Validate email format
+  if (!email.match(/^[^@\s]+@[^@\s]+\.[^@\s]+$/)) {
+    return ctx.reply('❌ Invalid email format. Try again.');
+  }
+  
+  try {
+    const res = await axios.post(`${API_URL}/user/check`, { email });
+    const exists = res.data.exists;
+    
+    if (session.action === 'signup') {
+      if (exists) return ctx.reply('❌ Email already exists. Please log in or use /forgot.');
+      const code = generateCode();
+      await axios.post(`${API_URL}/telegram/code`, { email, code, type: 'signup' });
+      await ctx.reply(`✅ Your sign-up code: *${code}* (valid for ${CODE_EXPIRY_MINUTES} minutes)\nPaste this code in the website sign-up form.\n\nGet code again: /signup`, { parse_mode: 'Markdown' });
+      await sendBanner(ctx, 'Need help? Join channels below.');
+    } else if (session.action === 'forgot') {
+      if (!exists) return ctx.reply('❌ No account with this email. Try /signup.');
+      const code = generateCode();
+      await axios.post(`${API_URL}/telegram/code`, { email, code, type: 'forgot' });
+      await ctx.reply(`🔑 Password reset code: *${code}* (valid for ${CODE_EXPIRY_MINUTES} minutes)\nEnter it on the website.\n\nGet code again: /forgot`, { parse_mode: 'Markdown' });
+      await sendBanner(ctx, 'Join our community:');
     }
-  } catch { await ctx.reply("API error!"); }
-});
-bot.hears(/^(\.|\/)gdrive\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/download/gdrivedl?apikey=prince&url=" + encodeURIComponent(ctx.match[2]));
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: res.data.result ? `*GDrive Download*\n${res.data.result}` : "GDrive file not found.",
-      parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply("API error!"); }
-});
-
-// === GAME MENU (trivia, mathquiz, 8ball) ===
-// Trivia
-bot.hears(/^(\.|\/)trivia$/i, async ctx => {
-  try {
-    const res = await axios.get('https://opentdb.com/api.php?amount=1&type=multiple');
-    const q = res.data.results[0];
-    const options = [q.correct_answer, ...q.incorrect_answers].sort(() => Math.random() - 0.5);
-    ctx.session = ctx.session || {}; ctx.session.trivia = q.correct_answer;
-    ctx.replyWithMarkdown(`*Trivia:*\n${q.question}\nOptions: ${options.map((x,i)=>`\n${i+1}. ${x}`).join('')}\nReply with .answer [number]`);
-  } catch { ctx.reply("Trivia error."); }
-});
-bot.hears(/^(\.|\/)answer\s+(.+)/i, async ctx => {
-  if (ctx.session && ctx.session.trivia) {
-    if (ctx.match[2].toLowerCase() === ctx.session.trivia.toLowerCase()) {
-      ctx.reply("Correct!");
-    } else ctx.reply("Wrong!");
-    delete ctx.session.trivia;
-  }
-});
-// Math Quiz
-bot.hears(/^(\.|\/)mathquiz$/i, async ctx => {
-  const a = Math.floor(Math.random()*20)+1, b = Math.floor(Math.random()*20)+1;
-  ctx.session = ctx.session || {}; ctx.session.math = a+b;
-  ctx.reply(`What is ${a} + ${b}? Reply with .mathans [answer]`);
-});
-bot.hears(/^(\.|\/)mathans\s+(\d+)/i, async ctx => {
-  if (ctx.session && ctx.session.math !== undefined) {
-    if (parseInt(ctx.match[2]) === ctx.session.math) ctx.reply("Correct!");
-    else ctx.reply("Wrong!");
-    delete ctx.session.math;
-  }
-});
-// 8ball
-bot.hears(/^(\.|\/)8ball\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get('https://8ball.delegator.com/magic/JSON/' + encodeURIComponent(ctx.match[2]));
-    ctx.reply(res.data.magic.answer);
-  } catch { ctx.reply("API error!"); }
-});
-
-// === OTHER MENU ===
-bot.hears(/^(\.|\/)repo$/i, async ctx => {
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: `*Bot Repo:*\n${REPO_URL}`,
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
-});
-bot.hears(/^(\.|\/)ping$/i, async ctx => {
-  const start = Date.now();
-  const sent = await ctx.reply('Pinging...');
-  const ms = Date.now() - start;
-  await ctx.deleteMessage(sent.message_id).catch(() => {});
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: `*Ping*: ${ms}ms`,
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
-});
-bot.hears(/^(\.|\/)runtime$/i, async ctx => {
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: `*Bot Uptime*\n${getUptime()}`,
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
-});
-
-// === ADULT MENU ===
-bot.hears(/^(\.|\/)xvideosearch\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/search/xvideossearch?apikey=prince&query=" + encodeURIComponent(ctx.match[2]));
-    const links = (res.data.result || []).slice(0, 5).join('\n') || "No results.";
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: `*Xvideos Results*\n${links}`,
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply('API error!'); }
-});
-bot.hears(/^(\.|\/)xnxxsearch\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/search/xnxxsearch?apikey=prince&query=" + encodeURIComponent(ctx.match[2]));
-    const links = (res.data.result || []).slice(0, 5).join('\n') || "No results.";
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: `*XNXX Results*\n${links}`,
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply('API error!'); }
-});
-bot.hears(/^(\.|\/)dl-xnxx\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/download/xnxxdl?apikey=prince&url=" + encodeURIComponent(ctx.match[2]));
-    const vid = res.data.result || res.data.url || '';
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: vid ? `*XNXX Download*\n${vid}` : "No video found.",
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply('API error!'); }
-});
-bot.hears(/^(\.|\/)dl-xvideo\s+(.+)/i, async ctx => {
-  try {
-    const res = await axios.get("https://api.princetechn.com/api/download/xvideosdl?apikey=prince&url=" + encodeURIComponent(ctx.match[2]));
-    const vid = res.data.result || res.data.url || '';
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: vid ? `*Xvideos Download*\n${vid}` : "No video found.",
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
-  } catch { await ctx.reply('API error!'); }
-});
-
-// === DEV MENU ===
-bot.hears(/^(\.|\/)statics$/i, async ctx => {
-  const cpus = os.cpus().length;
-  const mem = (os.totalmem() / 1024 / 1024).toFixed(0) + "MB";
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: `*Statics*\nCPU Cores: ${cpus}\nTotal Mem: ${mem}`,
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
-});
-bot.hears(/^(\.|\/)listusers$/i, async ctx => {
-  if (!isOwner(ctx)) return;
-  const { photo, buttons } = getBannerAndButtons();
-  const list = users.map(u => `${u.name} (${u.id})`).join('\n') || "No users found.";
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: `*User List*\n${list}`,
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
-});
-bot.hears(/^(\.|\/)logs$/i, async ctx => {
-  if (!isOwner(ctx)) return;
-  const { photo, buttons } = getBannerAndButtons();
-  await ctx.replyWithPhoto({ url: photo }, {
-    caption: "*Logs*\nNo logs implemented (dev only).",
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: buttons }
-  });
-});
-bot.hears(/^(\.|\/)setbanner\s+(.+)/i, async ctx => {
-  if (!isOwner(ctx)) return;
-  try {
-    let data = getData();
-    data.banner = ctx.match[2];
-    fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
-    await ctx.reply("Banner updated (affects new menu replies).");
-  } catch { await ctx.reply("Failed to update banner."); }
-});
-bot.hears(/^(\.|\/)setprefix\s+(.+)/i, async ctx => {
-  if (!isOwner(ctx)) return;
-  try {
-    let data = getData();
-    data.prefix = ctx.match[2].split(' ').filter(Boolean);
-    fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
-    await ctx.reply(`Prefix updated to: ${data.prefix.join(' ')}`);
-  } catch { await ctx.reply("Failed to update prefix."); }
-});
-bot.hears(/^(\.|\/)setbotname\s+(.+)/i, async ctx => {
-  if (!isOwner(ctx)) return;
-  try {
-    let data = getData();
-    data.botName = ctx.match[2];
-    fs.writeFileSync('./data.json', JSON.stringify(data, null, 2));
-    await ctx.reply(`Bot name updated to: ${data.botName}`);
-  } catch { await ctx.reply("Failed to update bot name."); }
-});
-
-// === Fallback for unrecognized commands
-bot.on('message', async ctx => {
-  if (
-    ctx.message &&
-    typeof ctx.message.text === 'string' &&
-    (ctx.message.text.startsWith('.') || ctx.message.text.startsWith('/'))
-  ) {
-    const { photo, buttons } = getBannerAndButtons();
-    await ctx.replyWithPhoto({ url: photo }, {
-      caption: getMenu(ctx),
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: buttons }
-    });
+    delete sessions[ctx.from.id];
+  } catch (e) {
+    await ctx.reply('❌ Error connecting to API. Try again later.');
   }
 });
 
-// Express Server for Render/any host
-const app = express();
-app.get('/', (req, res) => res.send('CYBIX BOT IS RUNNING'));
-app.get('/ping', (req, res) => res.send('pong'));
-app.listen(PORT, () => {
-  console.log(`Web server running on port ${PORT}`);
+// Error handling
+bot.catch((err, ctx) => {
+  console.error('Bot error', err);
+  ctx.reply('⚠️ An error occurred, please try again.');
 });
 
+// Launch bot
 bot.launch();
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+console.log('CYBIX TECH Telegram Bot running...');
+
+// For Render/Vercel keepalive
+if (process.env.PORT) {
+  require('http').createServer((req, res) => {
+    res.writeHead(200);
+    res.end('Bot is running');
+  }).listen(process.env.PORT);
+}
