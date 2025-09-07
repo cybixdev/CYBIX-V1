@@ -1,8 +1,14 @@
-require('dotenv').config();
-const { Telegraf, Markup } = require('telegraf');
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
+import 'dotenv/config.js';
+import { Telegraf, Markup } from 'telegraf';
+import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import http from 'http';
+
+// Node.js ESM __dirname polyfill:
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // === CONFIG ===
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -10,7 +16,7 @@ const OWNER_ID = process.env.OWNER_ID;
 const TG_CHANNEL = process.env.TG_CHANNEL || 't.me://cybixtech';
 const TG_CHANNEL_USERNAME = process.env.TG_CHANNEL_USERNAME || 'cybixtech';
 const WA_CHANNEL = process.env.WA_CHANNEL || 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
-const BANNER_URL = process.env.BANNER_URL || 'https://files.catbox.moe/2x9p8j.jpg';
+let BANNER_URL = process.env.BANNER_URL || 'https://files.catbox.moe/2x9p8j.jpg';
 let BOT_NAME = process.env.BOT_NAME || 'CYBIX V1';
 const BOT_VERSION = '1.2.0';
 let PREFIXES = ['.', '/'];
@@ -175,7 +181,7 @@ bot.hears(/^([./])setbanner\s+(.+)/i, async (ctx) => {
   if (ctx.from.id.toString() !== OWNER_ID) return;
   const url = ctx.match[2].trim();
   if (!url.match(/^https?:\/\/\S+$/)) return sendBanner(ctx, '❌ Provide a valid image URL.');
-  global.BANNER_URL = url;
+  BANNER_URL = url;
   await sendBanner(ctx, `✅ Banner image updated!`);
 });
 
@@ -414,8 +420,15 @@ bot.on('text', async (ctx, next) => {
   await next();
 });
 
-// === KEEPALIVE HTTP SERVER ===
-require('http').createServer((_, res) => res.end('Bot is running')).listen(process.env.PORT || 3000);
+// === KEEPALIVE HTTP SERVER and SELF-PING to prevent sleep ===
+const PORT = process.env.PORT || 3000;
+http.createServer((_, res) => res.end('Bot is running')).listen(PORT);
+// Self-ping every 4.5 minutes to avoid Render sleeping (for free plan)
+if (process.env.RENDER_EXTERNAL_URL) {
+  setInterval(() => {
+    axios.get(process.env.RENDER_EXTERNAL_URL).catch(() => {});
+  }, 1000 * 60 * 4.5);
+}
 
 bot.launch()
   .then(() => console.log('CYBIX BOT started.'))
