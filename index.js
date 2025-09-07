@@ -6,7 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
 
-// Node.js ESM __dirname polyfill:
+// Polyfill __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -66,11 +66,11 @@ async function requireChannelJoin(ctx, next) {
     if (['member', 'administrator', 'creator'].includes(member.status)) {
       return next();
     } else {
-      await sendBanner(ctx, `🚫 You must join our Telegram channel to use this bot!\n\n[Join Channel](${TG_CHANNEL.replace('t.me://', 'https://t.me/')})\n\nAfter joining, press /start again.`);
+      await sendBanner(ctx, `🚫 Please join our Telegram channel to use this bot!\n\n[Join Channel](${TG_CHANNEL.replace('t.me://', 'https://t.me/')})\nAfter joining, press /start again.`);
       return;
     }
   } catch (e) {
-    await sendBanner(ctx, `🚫 You must join our Telegram channel to use this bot!\n\n[Join Channel](${TG_CHANNEL.replace('t.me://', 'https://t.me/')})\n\nAfter joining, press /start again.`);
+    await sendBanner(ctx, `🚫 Please join our Telegram channel to use this bot!\n\n[Join Channel](${TG_CHANNEL.replace('t.me://', 'https://t.me/')})\nAfter joining, press /start again.`);
     return;
   }
 }
@@ -423,12 +423,6 @@ bot.on('text', async (ctx, next) => {
 // === KEEPALIVE HTTP SERVER and SELF-PING to prevent sleep ===
 const PORT = process.env.PORT || 3000;
 http.createServer((_, res) => res.end('Bot is running')).listen(PORT);
-// Self-ping every 4.5 minutes to avoid Render sleeping (for free plan)
-if (process.env.RENDER_EXTERNAL_URL) {
-  setInterval(() => {
-    axios.get(process.env.RENDER_EXTERNAL_URL).catch(() => {});
-  }, 1000 * 60 * 4.5);
-}
 
 bot.launch()
   .then(() => console.log('CYBIX BOT started.'))
