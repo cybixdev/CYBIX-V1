@@ -12,8 +12,6 @@ const TELEGRAM_CHANNEL = "https://t.me/cybixtech";
 const WEBSITE_LINK = "https://cybixtech.onrender.com";
 const BANNER_URL = "https://files.catbox.moe/p6f8el.jpg";
 
-const bot = new Telegraf(BOT_TOKEN);
-
 // Session store (for multi-step flows)
 const sessions = {}; // user_id: { action, timestamp }
 
@@ -25,12 +23,12 @@ function channelButtons() {
   ]);
 }
 
-function mainMenu(isOwner = false) {
-  // Unified menu for all users, owner sees extra button
+function mainMenuButtons(isOwner = false) {
   const buttons = [
     [Markup.button.callback('Sign Up', 'signup')],
     [Markup.button.callback('Forgot Password', 'forgot')],
     [Markup.button.callback('💎 Premium Info', 'premium')],
+    [Markup.button.callback('Users', 'users')],
     [Markup.button.callback('Help', 'help')]
   ];
   if (isOwner) buttons.push([Markup.button.callback('Add Premium', 'addprem')]);
@@ -41,7 +39,6 @@ function isOwner(ctx) {
   return String(ctx.from.id) === String(OWNER_ID);
 }
 
-// Helper: Generate random 6-char code
 function generateCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
@@ -51,125 +48,151 @@ function generateCode() {
   return code;
 }
 
-async function sendBannerMenu(ctx, text = '', extraMenu) {
+async function sendBanner(ctx, text, menu = true) {
   try {
     await ctx.replyWithPhoto(BANNER_URL, {
       caption: text,
       ...channelButtons()
     });
-    await ctx.reply('Choose an option:', extraMenu || mainMenu(isOwner(ctx)));
+    if (menu) {
+      await ctx.reply('Menu:', mainMenuButtons(isOwner(ctx)));
+    }
   } catch {
     await ctx.reply(text, channelButtons());
-    await ctx.reply('Choose an option:', extraMenu || mainMenu(isOwner(ctx)));
+    if (menu) {
+      await ctx.reply('Menu:', mainMenuButtons(isOwner(ctx)));
+    }
   }
 }
 
-// Unified entry point
 bot.start(async (ctx) => {
-  await sendBannerMenu(ctx, `👋 Welcome to CYBIX TECH Bot!\nAll features are below.\n`);
+  await sendBanner(ctx, `👋 Welcome to CYBIX TECH Bot!`);
 });
 
-// /help is only command shown
 bot.help(async (ctx) => {
-  await sendBannerMenu(ctx, `🚀 CYBIX TECH Bot Help:\nUse the menu below for all actions.\nOnly /start and /help are visible.`);
+  await sendBanner(ctx, 'Use the menu below for all actions.');
 });
 
-// Unified button handlers
 bot.action('signup', async (ctx) => {
   sessions[ctx.from.id] = { action: 'signup', timestamp: Date.now() };
-  await sendBannerMenu(ctx, '🔒 Enter your email for sign-up:');
-});
-bot.action('forgot', async (ctx) => {
-  sessions[ctx.from.id] = { action: 'forgot', timestamp: Date.now() };
-  await sendBannerMenu(ctx, '🔑 Enter your registered email to reset password:');
-});
-bot.action('premium', async (ctx) => {
-  await sendBannerMenu(ctx, `💎 Premium lets you upload ZIP/files, batch obfuscate/deobfuscate.\nContact @cybixdev to buy premium. Owner will activate for 1 month.`);
-});
-bot.action('help', async (ctx) => {
-  await sendBannerMenu(
-    ctx,
-    `🚀 CYBIX TECH Bot Help:\n• Sign Up: Get sign-up code\n• Forgot Password: Reset password\n• Premium Info: Info about premium\n• Add Premium: Owner-only\n\nUse the menu below for all actions.`
-  );
-});
-bot.action('addprem', async (ctx) => {
-  if (!isOwner(ctx)) return sendBannerMenu(ctx, '❌ Only owner can use this.');
-  sessions[ctx.from.id] = { action: 'addprem', timestamp: Date.now() };
-  await sendBannerMenu(ctx, 'Enter the email to grant premium access:');
+  await sendBanner(ctx, '🔒 Enter your email for sign-up:', false);
 });
 
-// Handle text for all flows
+bot.action('forgot', async (ctx) => {
+  sessions[ctx.from.id] = { action: 'forgot', timestamp: Date.now() };
+  await sendBanner(ctx, '🔑 Enter your registered email to reset password:', false);
+});
+
+bot.action('premium', async (ctx) => {
+  await sendBanner(ctx, `💎 Premium lets you upload ZIP/files, batch obfuscate/deobfuscate.\nContact @cybixdev to buy premium. Owner will activate for 1 month.`);
+});
+
+bot.action('help', async (ctx) => {
+  await sendBanner(
+    ctx,
+    `Sign Up: Get sign-up code\nForgot Password: Reset password\nPremium Info: Info about premium\nUsers: See registered website users\nAdd Premium: Owner only`
+  );
+});
+
+bot.action('addprem', async (ctx) => {
+  if (!isOwner(ctx)) return sendBanner(ctx, '❌ Only owner can use this.');
+  sessions[ctx.from.id] = { action: 'addprem', timestamp: Date.now() };
+  await sendBanner(ctx, 'Enter the email to grant premium access:', false);
+});
+
+bot.action('users', async (ctx) => {
+  try {
+    const res = await axios.get(`${API_URL}/user/list`);
+    const users = res.data.users;
+    if (!users || users.length === 0) {
+      await sendBanner(ctx, 'No registered users found.');
+    } else {
+      let msg = `Registered users:\n`;
+      msg += users.map((u, i) => `${i + 1}. ${u.email}${u.premium ? ' (Premium)' : ''}`).join('\n');
+      await sendBanner(ctx, msg);
+    }
+  } catch {
+    await sendBanner(ctx, 'Error fetching users.');
+  }
+});
+
 bot.on('text', async (ctx) => {
   const session = sessions[ctx.from.id];
   if (!session || !session.action) {
-    // If not in a flow, always show menu
-    return sendBannerMenu(
-      ctx,
-      'Please use the menu below to interact with CYBIX TECH Bot.'
-    );
+    return sendBanner(ctx, 'Please use the menu below.');
   }
   
   const email = ctx.message.text.trim().toLowerCase();
-  // Validate email format
   if (!email.match(/^[^@\s]+@[^@\s]+\.[^@\s]+$/)) {
-    return sendBannerMenu(ctx, '❌ Invalid email format. Try again.');
+    return sendBanner(ctx, '❌ Invalid email format. Try again.', false);
   }
   
-  // Add premium (owner only)
   if (session.action === 'addprem' && isOwner(ctx)) {
     try {
       await axios.post(`${API_URL}/admin/add-premium`, { email });
-      await sendBannerMenu(ctx, `✅ Premium added for ${email}.`);
-    } catch (e) {
-      await sendBannerMenu(ctx, '❌ Failed to add premium. Check API or email.');
+      await sendBanner(ctx, `✅ Premium added for ${email}.`);
+    } catch {
+      await sendBanner(ctx, '❌ Failed to add premium. Check API or email.');
     }
     delete sessions[ctx.from.id];
     return;
   }
   
-  // Signup / forgot flows
   try {
     const res = await axios.post(`${API_URL}/user/check`, { email });
     const exists = res.data.exists;
     
     if (session.action === 'signup') {
-      if (exists) return sendBannerMenu(ctx, '❌ Email already exists. Please log in or use Forgot Password.');
+      if (exists) return sendBanner(ctx, '❌ Email already exists. Please log in or use Forgot Password.', false);
       const code = generateCode();
       await axios.post(`${API_URL}/telegram/code`, { email, code, type: 'signup' });
-      await sendBannerMenu(
+      await sendBanner(
         ctx,
-        `✅ Your sign-up code: *${code}* (valid for ${CODE_EXPIRY_MINUTES} minutes)\nPaste this code in the website sign-up form.\n\nGet code again from the menu.`
+        `✅ Your sign-up code: *${code}* (valid for ${CODE_EXPIRY_MINUTES} minutes)\nPaste this code in the website sign-up form.`
       );
     } else if (session.action === 'forgot') {
-      if (!exists) return sendBannerMenu(ctx, '❌ No account with this email. Try Sign Up.');
+      if (!exists) return sendBanner(ctx, '❌ No account with this email. Try Sign Up.', false);
       const code = generateCode();
       await axios.post(`${API_URL}/telegram/code`, { email, code, type: 'forgot' });
-      await sendBannerMenu(
+      await sendBanner(
         ctx,
-        `🔑 Password reset code: *${code}* (valid for ${CODE_EXPIRY_MINUTES} minutes)\nEnter it on the website.\n\nGet code again from the menu.`
+        `🔑 Password reset code: *${code}* (valid for ${CODE_EXPIRY_MINUTES} minutes)\nEnter it on the website.`
       );
     }
     delete sessions[ctx.from.id];
-  } catch (e) {
-    await sendBannerMenu(ctx, '❌ Error connecting to API. Try again later.');
+  } catch {
+    await sendBanner(ctx, '❌ Error connecting to API. Try again later.');
     delete sessions[ctx.from.id];
   }
 });
 
-// Owner can use /addprem as a fallback if needed (never shown to users)
 bot.command('addprem', async (ctx) => {
-  if (!isOwner(ctx)) return sendBannerMenu(ctx, '❌ Only owner can use this.');
+  if (!isOwner(ctx)) return sendBanner(ctx, '❌ Only owner can use this.');
   sessions[ctx.from.id] = { action: 'addprem', timestamp: Date.now() };
-  await sendBannerMenu(ctx, 'Enter the email to grant premium access:');
+  await sendBanner(ctx, 'Enter the email to grant premium access:', false);
 });
 
-// Error Handling
+bot.command('users', async (ctx) => {
+  try {
+    const res = await axios.get(`${API_URL}/user/list`);
+    const users = res.data.users;
+    if (!users || users.length === 0) {
+      await sendBanner(ctx, 'No registered users found.');
+    } else {
+      let msg = `Registered users:\n`;
+      msg += users.map((u, i) => `${i + 1}. ${u.email}${u.premium ? ' (Premium)' : ''}`).join('\n');
+      await sendBanner(ctx, msg);
+    }
+  } catch {
+    await sendBanner(ctx, 'Error fetching users.');
+  }
+});
+
 bot.catch((err, ctx) => {
   console.error('Bot error', err);
-  sendBannerMenu(ctx, '⚠️ An error occurred, please try again.');
+  sendBanner(ctx, '⚠️ An error occurred, please try again.');
 });
 
-// For Render/Vercel keepalive
 if (process.env.PORT) {
   require('http').createServer((req, res) => {
     res.writeHead(200);
