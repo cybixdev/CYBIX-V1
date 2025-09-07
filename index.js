@@ -7,17 +7,18 @@ const axios = require('axios');
 const path = require('path');
 const packageJson = require('./package.json');
 
+// --- ENV ---
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const OWNER_ID = process.env.OWNER_ID;
 const PORT = process.env.PORT || 8080;
 
-const CHANNEL_LINK = 't.me://cybixtech';
-const CHANNEL_USERNAME = 'cybixtech'; // without @
-const WHATSAPP_LINK = 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
-const REPO_URL = 'https://github.com/Dev-Ops610/cybix-telegram-bot';
-const OWNER_TAG = '@cybixdev';
-
-const BANNER_URL = 'https://files.catbox.moe/2x9p8j.jpg';
+// --- CONFIG ---
+const CHANNEL_LINK = process.env.CHANNEL_LINK || 't.me://cybixtech';
+const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME || 'cybixtech';
+const WHATSAPP_LINK = process.env.WHATSAPP_LINK || 'https://whatsapp.com/channel/0029VbB8svo65yD8WDtzwd0X';
+const REPO_URL = process.env.REPO_URL || 'https://github.com/Dev-Ops610/cybix-telegram-bot';
+const OWNER_TAG = process.env.OWNER_TAG || '@cybixdev';
+const BANNER_URL = process.env.BANNER_URL || 'https://files.catbox.moe/2x9p8j.jpg';
 
 function getData() {
   try {
@@ -38,7 +39,6 @@ function getUptime() {
   return `${h}h ${m}m ${s}s`;
 }
 function getBannerAndButtons() {
-  // Buttons stacked vertically, one on top, one on bottom
   return {
     photo: getBanner(),
     buttons: [
@@ -48,6 +48,7 @@ function getBannerAndButtons() {
   };
 }
 
+// --- USERS ---
 const USERS_FILE = path.join(__dirname, 'users.json');
 let users = [];
 function loadUsers() {
@@ -67,12 +68,6 @@ function saveUser(ctx) {
     existing.name = ctx.from.first_name || '';
     saveUsers();
   }
-  if ((ctx.chat.type === 'group' || ctx.chat.type === 'supergroup' || ctx.chat.type === 'channel')) {
-    if (!users.find(u => u.id === ctx.chat.id)) {
-      users.push({ id: ctx.chat.id, name: ctx.chat.title || '', type: ctx.chat.type });
-      saveUsers();
-    }
-  }
 }
 function isOwner(ctx) {
   return ctx.from && ctx.from.id && ctx.from.id.toString() === OWNER_ID.toString();
@@ -84,7 +79,7 @@ function getMenu(ctx) {
 │ ✦ Owner : ${OWNER_TAG}
 │ ✦ User : ${ctx.from?.first_name || '-'}
 │ ✦ User ID : ${ctx.from?.id || '-'}
-│ ✦ Users : ${users.filter(u=>u.type==='private'||!u.type).length}
+│ ✦ Users : ${users.length}
 │ ✦ Speed : ${Math.floor(Math.random() * 10 + 1)}ms
 │ ✦ Status : Online
 │ ✦ Uptime : ${getUptime()}
@@ -144,7 +139,6 @@ Powered by CYBIX DEVS`
   );
 }
 
-// UNIVERSAL SEND WITH BANNER AND BUTTONS
 async function sendWithBanner(ctx, caption, opts = {}) {
   const { photo, buttons } = getBannerAndButtons();
   try {
@@ -161,14 +155,13 @@ async function sendWithBanner(ctx, caption, opts = {}) {
   }
 }
 
-// === BOT INIT ===
+// --- BOT INIT ---
 if (!BOT_TOKEN || !OWNER_ID) {
   console.error('BOT_TOKEN and OWNER_ID must be set in .env');
   process.exit(1);
 }
 const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 60_000 });
 
-// === REQUIRE CHANNEL JOIN ===
 async function requireChannelJoin(ctx, next) {
   if (!ctx.from || ctx.chat.type !== 'private') return next();
   try {
@@ -185,12 +178,12 @@ async function requireChannelJoin(ctx, next) {
 bot.use((ctx, next) => { saveUser(ctx); return next(); });
 bot.use(requireChannelJoin);
 
-// === MENU ===
+// MENU
 bot.hears(/^(\.|\/)(menu|start)$/i, async ctx => {
   await sendWithBanner(ctx, getMenu(ctx));
 });
 
-// === AI MENU ===
+// -- AI MENU --
 const aiApi = "https://api.princetechn.com/api/ai";
 ['chatgpt','openai','blackbox','gemini','deepseek'].forEach(cmd=>{
   bot.hears(new RegExp(`^(\\.|\\/)${cmd}\\s+(.+)$`, 'i'), async ctx => {
@@ -215,7 +208,7 @@ bot.hears(/^(\.|\/)text2img\s+(.+)/i, async ctx => {
   } catch { await sendWithBanner(ctx, "API error!"); }
 });
 
-// === DL MENU ===
+// -- DL MENU --
 const dlApi = "https://api.princetechn.com/api/download";
 const dlCmds = {
   apk: "apkdl?apikey=prince&appName=",
@@ -243,7 +236,7 @@ Object.entries(dlCmds).forEach(([cmd, url])=>{
   });
 });
 
-// === GAME MENU ===
+// -- GAME MENU --
 bot.hears(/^(\.|\/)trivia$/i, async ctx => {
   try {
     const res = await axios.get('https://opentdb.com/api.php?amount=1&type=multiple');
@@ -280,7 +273,7 @@ bot.hears(/^(\.|\/)8ball\s+(.+)/i, async ctx => {
   } catch { await sendWithBanner(ctx,"API error!"); }
 });
 
-// === PORN MENU ===
+// -- PORN MENU --
 bot.hears(/^(\.|\/)porn$/i, async ctx => {
   try {
     const res = await axios.get('https://nekos.life/api/v2/img/pussy');
@@ -327,7 +320,7 @@ bot.hears(/^(\.|\/)cum$/i, async ctx => {
   } catch { await sendWithBanner(ctx,"API error!"); }
 });
 
-// === OTHER MENU ===
+// -- OTHER MENU --
 bot.hears(/^(\.|\/)repo$/i, async ctx => {
   await sendWithBanner(ctx, `*Bot Repo:*\n${REPO_URL}`);
 });
@@ -342,7 +335,7 @@ bot.hears(/^(\.|\/)runtime$/i, async ctx => {
   await sendWithBanner(ctx, `*Bot Uptime*\n${getUptime()}`);
 });
 
-// === DEV MENU ===
+// -- DEV MENU --
 bot.hears(/^(\.|\/)statics$/i, async ctx => {
   const cpus = os.cpus().length;
   const mem = (os.totalmem() / 1024 / 1024).toFixed(0) + "MB";
@@ -398,7 +391,7 @@ bot.hears(/^(\.|\/)setbotname\s+(.+)/i, async ctx => {
   } catch { await sendWithBanner(ctx, "Failed to update bot name."); }
 });
 
-// === FALLBACK for unknown commands ===
+// -- FALLBACK --
 bot.on('message', async ctx => {
   if (
     ctx.message &&
@@ -409,13 +402,13 @@ bot.on('message', async ctx => {
   }
 });
 
-// === EXPRESS SERVER ===
+// -- EXPRESS SERVER --
 const app = express();
 app.get('/', (req, res) => res.send('CYBIX BOT IS RUNNING'));
 app.get('/ping', (req, res) => res.send('pong'));
 app.listen(PORT, () => {
   console.log(`Web server running on port ${PORT}`);
-});
+})
 
 bot.launch().then(()=>console.log('Bot started!')).catch(e=>console.error(e));
 process.once('SIGINT', () => bot.stop('SIGINT'));
